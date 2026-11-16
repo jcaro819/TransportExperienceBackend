@@ -1,0 +1,25 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-01 Consultar el portal institucional y los horarios (HU-01)
+
+autonumber
+actor "Visitante o\ncliente" as cliente
+participant "frontend/" as front
+participant "portal/rutas.py" as rutas
+participant "portal/servicio.py" as servicio
+database "PostgreSQL" as bd
+
+cliente -> front : abre el portal (sin iniciar sesión)
+front -> rutas : GET /portal
+rutas -> servicio : ver_portal() → obtener_portal(sesion)
+servicio -> bd : SELECT contenido_portal\n(misión, visión, contacto...)
+servicio -> bd : SELECT horarios_atencion (los 7 días)
+servicio --> rutas : Portal (secciones y horarios)
+rutas --> front : 200 PortalRespuesta
+front --> cliente : muestra las secciones y los horarios
+
+note over cliente, bd
+  Es público: no exige JWT. Son dos consultas pequeñas,
+  para cumplir la carga en menos de 2 segundos de HU-01.
+end note
+@enduml

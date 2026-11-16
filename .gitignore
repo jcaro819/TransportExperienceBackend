@@ -30,3 +30,6 @@ backups/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Herramientas descargadas por los scripts (p. ej. el .jar de PlantUML)
+.herramientas/

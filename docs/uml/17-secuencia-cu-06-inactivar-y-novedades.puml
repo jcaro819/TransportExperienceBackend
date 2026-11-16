@@ -1,0 +1,61 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-06 Inactivar una unidad y gestionar novedades (HU-09)
+
+autonumber
+actor "Administrador\nu operador" as taller
+actor "Domiciliario" as domiciliario
+participant "inventario/rutas.py" as rutas
+participant "inventario/servicio.py" as servicio
+participant "auditoria.py" as auditoria
+database "PostgreSQL" as bd
+
+== Inactivar una unidad (HU-09) ==
+taller -> rutas : GET /vehiculos + JWT\n(filtros: estado, modelo_id, codigo)
+rutas -> servicio : listar_vehiculos()
+rutas --> taller : 200 Pagina[VehiculoGestion]
+taller -> rutas : POST /vehiculos/{vehiculo_id}/inactivacion + JWT\n(con el motivo)
+rutas -> servicio : inactivar() → inactivar_vehiculo()
+servicio -> servicio : reportar_novedad() con una novedad crítica
+servicio -> bd : bloquear_vehiculo(): SELECT ... FOR UPDATE
+servicio -> bd : INSERT novedades_vehiculo (el motivo)
+servicio -> servicio : cambiar_estado_vehiculo():\nvalidar_transicion() → mantenimiento
+servicio -> auditoria : registrar_auditoria()
+servicio -> bd : commit
+rutas --> taller : 201 OperacionVehiculo\n(con alquileres_afectados)
+
+note right of bd
+  Desde el commit la unidad ya no sale en el
+  catálogo público: solo cuenta las unidades
+  en estado "disponible".
+end note
+
+== Reportar una novedad ==
+domiciliario -> rutas : POST /vehiculos/{vehiculo_id}/novedades + JWT
+rutas -> servicio : reportar_novedad()
+alt domiciliario y la unidad no es la de una entrega suya en ruta
+  servicio --> rutas : PermisoDenegado
+else puede reportar
+  servicio -> bd : INSERT novedades_vehiculo
+  opt la novedad es crítica
+    servicio -> servicio : cambiar_estado_vehiculo() → mantenimiento
+  end
+  rutas --> domiciliario : 201 OperacionVehiculo
+end
+
+== Cerrar la novedad y volver a servicio ==
+taller -> rutas : GET /vehiculos/{vehiculo_id}/novedades + JWT
+rutas -> servicio : listar_novedades()
+taller -> rutas : POST /vehiculos/{vehiculo_id}/novedades/{novedad_id}/cierre + JWT\n(solución; opcional: volver a servicio)
+rutas -> servicio : cerrar_novedad()
+servicio -> bd : bloquear_vehiculo(); UPDATE de la novedad (cerrada)
+opt se pide devolver la unidad a servicio
+  servicio -> servicio : _verificar_que_puede_volver()
+  alt otra novedad crítica abierta, compra pendiente,\nalquiler en curso o domicilio sin finalizar
+    servicio --> rutas : NoPuedeVolverAServicio (con la causa)
+  else puede volver
+    servicio -> servicio : cambiar_estado_vehiculo() → disponible
+  end
+end
+rutas --> taller : 200 OperacionVehiculo
+@enduml

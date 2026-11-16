@@ -1,0 +1,396 @@
+@startuml
+' GENERADO por scripts/generar_uml.py desde el código. No editar a mano.
+!include estilo.iuml
+title Diagrama de clases — entidades de SQLAlchemy (21 tablas)
+
+set separator none
+package "alquileres" {
+  class Alquiler <<alquileres>> {
+    PK id : integer
+    FK cliente_id : integer
+    FK vehiculo_id : integer
+    fecha_inicio : date
+    fecha_fin : date
+    tarifa_diaria : bigint
+    subtotal : bigint
+    valor_envio : bigint
+    total : bigint
+    estado : EstadoAlquiler
+    expira_en : timestamptz [0..1]
+    motivo_cancelacion : text [0..1]
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+    --
+    dias  <<property>>
+  }
+  enum EstadoAlquiler {
+    pendiente_pago
+    confirmado
+    en_curso
+    finalizado
+    cancelado
+    expirado
+  }
+}
+package "auditoria.py" {
+  class RegistroAuditoria <<auditoria>> {
+    PK id : bigint
+    FK usuario_id : integer [0..1]
+    accion : varchar
+    entidad : varchar
+    entidad_id : varchar
+    datos_anteriores : jsonb [0..1]
+    datos_nuevos : jsonb [0..1]
+    ocurrido_en : timestamptz
+  }
+}
+package "domicilios" {
+  class Domicilio <<domicilios>> {
+    PK id : integer
+    codigo_rastreo : varchar
+    FK cliente_id : integer
+    FK alquiler_id : integer [0..1]
+    FK venta_id : integer [0..1]
+    FK zona_id : integer
+    direccion : varchar
+    indicaciones : varchar [0..1]
+    latitud : numeric
+    longitud : numeric
+    estado : EstadoDomicilio
+    FK domiciliario_id : integer [0..1]
+    FK vehiculo_transporte_id : integer [0..1]
+    entregado_en : timestamptz [0..1]
+    motivo_cancelacion : text [0..1]
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  class HistorialEstadoDomicilio <<historial_estados_domicilio>> {
+    PK id : integer
+    FK domicilio_id : integer
+    estado_anterior : EstadoDomicilio [0..1]
+    estado_nuevo : EstadoDomicilio
+    FK cambiado_por_id : integer [0..1]
+    cambiado_en : timestamptz
+  }
+  class ZonaCobertura <<zonas_cobertura>> {
+    PK id : integer
+    nombre : varchar
+    poligono : jsonb
+    tarifa_envio : bigint
+    activa : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  enum EstadoDomicilio {
+    pendiente
+    asignado
+    recogido
+    en_camino
+    entregado
+    cancelado
+  }
+}
+package "inventario" {
+  class ModeloVehiculo <<modelos_vehiculo>> {
+    PK id : integer
+    FK tipo_vehiculo_id : integer
+    marca : varchar [0..1]
+    nombre : varchar
+    descripcion : text [0..1]
+    imagen_url : varchar [0..1]
+    tarifa_diaria : bigint [0..1]
+    precio_venta : bigint [0..1]
+    activo : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  class NovedadVehiculo <<novedades_vehiculo>> {
+    PK id : integer
+    FK vehiculo_id : integer
+    tipo : TipoNovedad
+    descripcion : text
+    es_critica : boolean
+    estado : EstadoNovedad
+    FK reportada_por_id : integer
+    creado_en : timestamptz
+    FK cerrada_por_id : integer [0..1]
+    cerrada_en : timestamptz [0..1]
+    solucion : text [0..1]
+  }
+  class Producto <<productos>> {
+    PK id : integer
+    codigo : varchar
+    nombre : varchar
+    categoria : CategoriaProducto
+    descripcion : text [0..1]
+    imagen_url : varchar [0..1]
+    precio_venta : bigint
+    stock : integer
+    stock_minimo : integer
+    activo : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+    --
+    bajo_stock  <<property>>
+  }
+  class TipoVehiculo <<tipos_vehiculo>> {
+    PK id : integer
+    nombre : varchar
+    usa_bateria : boolean
+    activo : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  class Vehiculo <<vehiculos>> {
+    PK id : integer
+    codigo : varchar
+    FK modelo_id : integer
+    estado : EstadoVehiculo
+    nivel_bateria : smallint [0..1]
+    ubicacion : varchar [0..1]
+    observaciones : text [0..1]
+    hash_clave_gps : varchar [0..1]
+    fuente_gps : FuenteGps [0..1]
+    clave_gps_emitida_en : timestamptz [0..1]
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  enum CategoriaProducto {
+    accesorio
+    repuesto
+  }
+  enum EstadoNovedad {
+    abierta
+    cerrada
+  }
+  enum EstadoVehiculo {
+    disponible
+    reservado
+    alquilado
+    vendido
+    mantenimiento
+    asignado_a_domicilio
+  }
+  enum TipoNovedad {
+    dano
+    falla
+    perdida_accesorio
+    bateria_baja
+    incidente
+    mantenimiento
+  }
+}
+package "pagos" {
+  class EventoPago <<eventos_pago>> {
+    PK id : bigint
+    proveedor : varchar
+    clave_idempotencia : varchar [0..1]
+    FK pago_id : integer [0..1]
+    firma_valida : boolean
+    estado_reportado : varchar [0..1]
+    cuerpo_crudo : text
+    procesado : boolean
+    error : text [0..1]
+    recibido_en : timestamptz
+  }
+  class MetodoPago <<metodos_pago>> {
+    PK id : integer
+    codigo : varchar
+    nombre : varchar
+    activo : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  class Pago <<pagos>> {
+    PK id : integer
+    referencia : varchar
+    tipo : TipoPago
+    FK alquiler_id : integer [0..1]
+    FK venta_id : integer [0..1]
+    FK metodo_pago_id : integer
+    monto : bigint
+    estado : EstadoPago
+    proveedor : varchar
+    id_transaccion_pasarela : varchar [0..1]
+    FK pago_compensado_id : integer [0..1]
+    aprobado_en : timestamptz [0..1]
+    detalle_error : text [0..1]
+    url_redireccion : varchar [0..1]
+    bloqueo_original_hasta : timestamptz [0..1]
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  enum EstadoPago {
+    pendiente
+    aprobado
+    rechazado
+    expirado
+    error
+  }
+  enum TipoPago {
+    cobro
+    compensacion
+  }
+}
+package "parametros.py" {
+  class ParametroSistema <<parametros_sistema>> {
+    PK clave : varchar
+    valor : integer
+    descripcion : text
+    actualizado_en : timestamptz
+  }
+}
+package "portal" {
+  class ContenidoPortal <<contenido_portal>> {
+    PK id : integer
+    seccion : varchar
+    titulo : varchar
+    contenido : text
+    actualizado_en : timestamptz
+  }
+  class HorarioAtencion <<horarios_atencion>> {
+    PK id : integer
+    dia_semana : smallint
+    hora_apertura : time
+    hora_cierre : time
+  }
+}
+package "rastreo" {
+  class PosicionGps <<posiciones_gps>> {
+    PK id : bigint
+    FK vehiculo_id : integer
+    latitud : numeric
+    longitud : numeric
+    precision_metros : numeric [0..1]
+    velocidad_kmh : numeric [0..1]
+    nivel_bateria : smallint [0..1]
+    fuente : FuenteGps
+    registrado_en : timestamptz
+    recibido_en : timestamptz
+  }
+  enum FuenteGps {
+    simulador
+    dispositivo
+  }
+}
+package "reportes" {
+  class Acta <<actas>> {
+    PK id : integer
+    tipo : TipoActa
+    FK vehiculo_id : integer
+    FK alquiler_id : integer [0..1]
+    FK venta_id : integer [0..1]
+    FK domicilio_id : integer [0..1]
+    estado_vehiculo : text
+    nivel_bateria : smallint [0..1]
+    FK registrada_por_id : integer
+    creado_en : timestamptz
+    FK conforme_por_id : integer [0..1]
+    conforme_en : timestamptz [0..1]
+    hash_pdf : varchar [0..1]
+    instantanea : jsonb [0..1]
+    --
+    cliente_id  <<property>>
+    numero  <<property>>
+  }
+  enum TipoActa {
+    entrega
+    recepcion
+  }
+}
+package "usuarios" {
+  class Usuario <<usuarios>> {
+    PK id : integer
+    nombre_completo : varchar
+    correo : varchar
+    telefono : varchar [0..1]
+    hash_contrasena : varchar
+    rol : Rol
+    activo : boolean
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  enum Rol {
+    cliente
+    administrador
+    operador
+    domiciliario
+  }
+}
+package "ventas" {
+  class ItemVenta <<items_venta>> {
+    PK id : integer
+    FK venta_id : integer
+    FK vehiculo_id : integer [0..1]
+    FK producto_id : integer [0..1]
+    cantidad : integer
+    precio_unitario : bigint
+    subtotal : bigint
+  }
+  class Venta <<ventas>> {
+    PK id : integer
+    FK cliente_id : integer
+    estado : EstadoVenta
+    subtotal : bigint
+    valor_envio : bigint
+    total : bigint
+    expira_en : timestamptz [0..1]
+    motivo_cancelacion : text [0..1]
+    creado_en : timestamptz
+    actualizado_en : timestamptz
+  }
+  enum EstadoVenta {
+    pendiente_pago
+    pagada
+    cancelada
+    expirada
+  }
+}
+
+Acta "*" --> "0..1" Alquiler : alquiler_id
+Acta "*" --> "0..1" Domicilio : domicilio_id
+Acta "*" --> "0..1" Usuario : conforme_por_id
+Acta "*" --> "0..1" Venta : venta_id
+Acta "*" --> "1" Usuario : registrada_por_id
+Acta "*" --> "1" Vehiculo : vehiculo_id
+Alquiler "*" --> "1" Usuario : cliente_id
+Alquiler "*" --> "1" Vehiculo : vehiculo_id
+Domicilio "*" --> "0..1" Alquiler : alquiler_id
+Domicilio "*" --> "0..1" Usuario : domiciliario_id
+Domicilio "*" --> "0..1" Vehiculo : vehiculo_transporte_id
+Domicilio "*" --> "0..1" Venta : venta_id
+Domicilio "*" --> "1" Usuario : cliente_id
+Domicilio "*" --> "1" ZonaCobertura : zona_id
+EventoPago "*" --> "0..1" Pago : pago_id
+HistorialEstadoDomicilio "*" --> "0..1" Usuario : cambiado_por_id
+HistorialEstadoDomicilio "*" --> "1" Domicilio : domicilio_id
+ItemVenta "*" --> "0..1" Producto : producto_id
+ItemVenta "*" --> "0..1" Vehiculo : vehiculo_id
+ItemVenta "*" --> "1" Venta : venta_id
+ModeloVehiculo "*" --> "1" TipoVehiculo : tipo_vehiculo_id
+NovedadVehiculo "*" --> "0..1" Usuario : cerrada_por_id
+NovedadVehiculo "*" --> "1" Usuario : reportada_por_id
+NovedadVehiculo "*" --> "1" Vehiculo : vehiculo_id
+Pago "*" --> "0..1" Alquiler : alquiler_id
+Pago "*" --> "0..1" Pago : pago_compensado_id
+Pago "*" --> "0..1" Venta : venta_id
+Pago "*" --> "1" MetodoPago : metodo_pago_id
+PosicionGps "*" --> "1" Vehiculo : vehiculo_id
+RegistroAuditoria "*" --> "0..1" Usuario : usuario_id
+Vehiculo "*" --> "1" ModeloVehiculo : modelo_id
+Venta "*" --> "1" Usuario : cliente_id
+Acta ..> TipoActa
+Alquiler ..> EstadoAlquiler
+Domicilio ..> EstadoDomicilio
+HistorialEstadoDomicilio ..> EstadoDomicilio
+NovedadVehiculo ..> EstadoNovedad
+NovedadVehiculo ..> TipoNovedad
+Pago ..> EstadoPago
+Pago ..> TipoPago
+PosicionGps ..> FuenteGps
+Producto ..> CategoriaProducto
+Usuario ..> Rol
+Vehiculo ..> EstadoVehiculo
+Vehiculo ..> FuenteGps
+Venta ..> EstadoVenta
+@enduml

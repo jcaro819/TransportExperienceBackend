@@ -1,0 +1,44 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-02 Editar secciones y horarios del portal (HU-01)
+
+autonumber
+actor "Administrador" as admin
+participant "frontend/" as front
+participant "portal/rutas.py" as rutas
+participant "seguridad.py" as seguridad
+participant "portal/servicio.py" as servicio
+participant "auditoria.py" as auditoria
+database "PostgreSQL" as bd
+
+== Editar una sección ==
+admin -> front : cambia el texto de una sección
+front -> rutas : PUT /portal/secciones/{seccion} + JWT\n{titulo, contenido}
+rutas -> seguridad : SoloAdministrador:\nrequiere_roles(Rol.ADMINISTRADOR)
+rutas -> servicio : editar_seccion() → guardar_seccion()
+servicio -> bd : SELECT contenido_portal de esa sección
+servicio -> bd : INSERT o UPDATE contenido_portal
+servicio -> auditoria : registrar_auditoria() con el antes y el después
+servicio -> bd : commit
+rutas --> front : 200 SeccionRespuesta
+
+== Abrir un día o cambiar su horario ==
+admin -> front : cambia el horario de un día
+front -> rutas : PUT /portal/horarios/{dia} + JWT\n{hora_apertura, hora_cierre}
+rutas -> servicio : editar_horario() → guardar_horario()
+servicio -> bd : INSERT o UPDATE horarios_atencion
+servicio -> auditoria : registrar_auditoria()
+rutas --> front : 200 HorarioDia
+
+== Dejar un día sin atención ==
+admin -> front : marca el día como cerrado
+front -> rutas : DELETE /portal/horarios/{dia} + JWT
+rutas -> servicio : cerrar_dia()
+alt el día estaba abierto
+  servicio -> bd : el día queda sin horario de atención
+  servicio -> auditoria : registrar_auditoria()
+else ya estaba cerrado
+  servicio -> servicio : no hace nada (ni audita)
+end
+rutas --> front : 200 HorarioDia
+@enduml

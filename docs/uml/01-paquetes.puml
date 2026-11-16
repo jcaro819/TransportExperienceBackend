@@ -1,0 +1,82 @@
+@startuml
+' GENERADO por scripts/generar_uml.py desde el código. No editar a mano.
+!include estilo.iuml
+title Diagrama de paquetes — TransportExperience (carpetas reales del código)
+
+package "app/" as app {
+  artifact "auditoria.py" as a_auditoria
+  artifact "config.py" as a_config
+  artifact "db.py" as a_db
+  artifact "main.py" as a_main
+  artifact "modelos.py" as a_modelos
+  artifact "parametros.py" as a_parametros
+  artifact "seguridad.py" as a_seguridad
+  folder "comun/\n<size:10>errores.py · fechas.py · modelos.py</size>\n<size:10>paginacion.py · peticiones.py</size>" as comun
+  package "modulos/" as modulos {
+    folder "alquileres/\n<size:10>consultas.py · esquemas.py · estados.py</size>\n<size:10>excepciones.py · modelos.py · rutas.py</size>\n<size:10>servicio.py</size>" as m_alquileres
+    folder "domicilios/\n<size:10>consultas.py · esquemas.py · estados.py</size>\n<size:10>excepciones.py · geometria.py · liberacion.py</size>\n<size:10>modelos.py · rutas.py · servicio.py</size>" as m_domicilios
+    folder "inventario/\n<size:10>esquemas.py · esquemas_gestion.py · estados.py</size>\n<size:10>excepciones.py · gestion.py · modelos.py</size>\n<size:10>rutas.py · rutas_gestion.py · servicio.py</size>" as m_inventario
+    folder "pagos/\n<size:10>comprobante.py · esquemas.py · excepciones.py</size>\n<size:10>modelos.py · pasarela.py · procesamiento.py</size>\n<size:10>rutas.py · servicio.py · wompi.py</size>" as m_pagos
+    folder "portal/\n<size:10>esquemas.py · modelos.py · rutas.py</size>\n<size:10>servicio.py</size>" as m_portal
+    folder "rastreo/\n<size:10>esquemas.py · excepciones.py · modelos.py</size>\n<size:10>rutas.py · servicio.py</size>" as m_rastreo
+    folder "reportes/\n<size:10>documentos.py · esquemas.py · excepciones.py</size>\n<size:10>modelos.py · registro.py · rutas.py</size>\n<size:10>servicio.py</size>" as m_reportes
+    folder "usuarios/\n<size:10>esquemas.py · excepciones.py · modelos.py</size>\n<size:10>rutas.py · servicio.py</size>" as m_usuarios
+    folder "ventas/\n<size:10>consultas.py · esquemas.py · estados.py</size>\n<size:10>excepciones.py · liberacion.py · modelos.py</size>\n<size:10>rutas.py · servicio.py</size>" as m_ventas
+  }
+}
+folder "simulador_gps/\n<size:10>~__main~__.py · movimiento.py · rutas.py</size>\n<size:10>simulador.py</size>" as c_simulador_gps
+folder "frontend/\n<size:10>README.md · app.js · index.html</size>\n<size:10>paneles.js · styles.css</size>" as c_frontend
+
+a_main ..> a_config
+a_main ..> a_db
+a_main ..> comun
+a_main --> m_alquileres : include_router
+a_main --> m_domicilios : include_router
+a_main --> m_inventario : include_router
+a_main --> m_pagos : include_router
+a_main --> m_portal : include_router
+a_main --> m_rastreo : include_router
+a_main --> m_reportes : include_router
+a_main --> m_usuarios : include_router
+a_main --> m_ventas : include_router
+m_alquileres <..> m_domicilios
+m_alquileres <..> m_inventario
+m_alquileres <..> m_pagos
+m_alquileres <..> m_reportes
+m_alquileres ..> m_usuarios
+m_alquileres <..> m_ventas
+m_domicilios <..> m_inventario
+m_domicilios ..> m_pagos
+m_domicilios ..> m_reportes
+m_domicilios ..> m_usuarios
+m_domicilios <..> m_ventas
+m_inventario <..> m_rastreo
+m_inventario ..> m_usuarios
+m_inventario <..> m_ventas
+m_pagos ..> m_inventario
+m_pagos ..> m_usuarios
+m_pagos <..> m_ventas
+m_portal ..> m_usuarios
+m_rastreo ..> m_usuarios
+m_reportes ..> m_inventario
+m_reportes ..> m_usuarios
+m_reportes ..> m_ventas
+m_ventas ..> m_usuarios
+a_auditoria ..> a_db
+a_db ..> a_config
+a_parametros ..> a_db
+a_seguridad ..> a_config
+a_seguridad ..> a_db
+a_seguridad ..> comun
+a_seguridad ..> m_usuarios
+
+c_frontend ..> a_main : HTTP/JSON
+c_simulador_gps ..> a_main : HTTP (posiciones GPS)
+
+legend right
+  Flecha continua: main.py reúne el enrutador del módulo (include_router).
+  Flecha punteada: un paquete importa a otro (doble punta: en ambos sentidos).
+  Los módulos de app/modulos/ usan además: auditoria.py, config.py, db.py, parametros.py, seguridad.py, comun/.
+  app/modelos.py solo importa los modelos para que Alembic vea las tablas.
+end legend
+@enduml

@@ -1,0 +1,45 @@
+' Estilo común de los diagramas de TransportExperience. Lo incluyen todos los .puml.
+'
+' "smetana" es el motor de distribución que trae PlantUML por dentro: así las imágenes se
+' generan solo con Java, sin instalar Graphviz. Quien tenga Graphviz puede borrar esa línea.
+!pragma layout smetana
+
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam ArrowColor #44546A
+skinparam ArrowFontSize 11
+skinparam NoteBackgroundColor #FFF8DC
+skinparam NoteBorderColor #B8A765
+skinparam PackageBorderColor #44546A
+skinparam PackageBackgroundColor #F7F9FC
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #44546A
+  BackgroundColor<<rutas>> #E3F2FD
+  BackgroundColor<<servicio>> #E8F5E9
+  BackgroundColor<<modelos>> #FFF3E0
+  BackgroundColor<<control maestro>> #EDE7F6
+}
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #44546A
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #44546A
+  BackgroundColor<<fuera del MVP>> #EEEEEE
+  BorderColor<<fuera del MVP>> #9E9E9E
+  FontColor<<fuera del MVP>> #757575
+}
+skinparam sequence {
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantBorderColor #44546A
+  LifeLineBorderColor #44546A
+  GroupBackgroundColor #E3F2FD
+  DividerBackgroundColor #F7F9FC
+}
+hide empty members

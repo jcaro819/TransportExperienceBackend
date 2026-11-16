@@ -1,0 +1,70 @@
+@startuml
+!include estilo.iuml
+title Diagrama de componentes — TransportExperience (MVP)
+
+left to right direction
+
+component "frontend/\n<size:10>index.html · app.js · styles.css</size>" as frontend
+component "simulador_gps\n<size:10>python -m simulador_gps</size>" as simulador
+component "Dispositivo GPS real\n<size:10>hardware; usa el mismo endpoint</size>" as dispositivo
+cloud "Wompi (sandbox)\n<size:10>sandbox.wompi.co/v1</size>" as wompi
+database "PostgreSQL 16\n<size:10>base transportexperience</size>" as postgres
+
+package "Backend: monolito modular (FastAPI). Carpeta app/" as backend {
+  component "main.py\n<size:10>control maestro:</size>\n<size:10>reúne los 12 enrutadores</size>" as main
+  component "modulos/usuarios" as usuarios
+  component "modulos/portal" as portal
+  component "modulos/inventario" as inventario
+  component "modulos/alquileres" as alquileres
+  component "modulos/ventas" as ventas
+  component "modulos/domicilios" as domicilios
+  component "modulos/reportes" as reportes
+  component "modulos/rastreo\n<size:10>recibe las posiciones GPS</size>" as rastreo
+  component "modulos/pagos\n<size:10>procesamiento.py · rutas.py</size>" as pagos
+  interface "PasarelaPagos" as pasarela
+  component "PasarelaWompi\n<size:10>pagos/wompi.py</size>" as pasarela_wompi
+  component "PasarelaFalsa\n<size:10>pagos/pasarela.py</size>\n<size:10>(tests y desarrollo)</size>" as pasarela_falsa
+  component "db.py\n<size:10>sesión de SQLAlchemy</size>" as db
+}
+
+frontend --> main : HTTP/JSON + JWT
+
+main --> usuarios
+main --> portal
+main --> inventario
+main --> alquileres
+main --> ventas
+main --> domicilios
+main --> reportes
+main --> rastreo
+main --> pagos
+
+usuarios --> db
+portal --> db
+inventario --> db
+alquileres --> db
+ventas --> db
+domicilios --> db
+reportes --> db
+rastreo --> db
+pagos --> db
+db --> postgres : SQL (psycopg)
+
+pagos --> pasarela : cobrar(), consultar()
+pasarela <|.. pasarela_wompi
+pasarela <|.. pasarela_falsa
+pasarela_wompi --> wompi : HTTPS: crea y consulta\nla transacción
+wompi --> pagos : webhook\nPOST /pagos/webhooks/wompi
+
+simulador --> rastreo : POST /rastreo/posiciones\nX-Clave-Gps, cada 5 s
+dispositivo ..> rastreo : POST /rastreo/posiciones\nX-Clave-Gps
+
+legend right
+  main.py --> módulo: app.include_router(...) del enrutador de ese módulo.
+  Todos los módulos usan además app/seguridad.py (JWT y roles),
+  app/auditoria.py (registrar_auditoria) y app/comun/ (errores, paginación, fechas).
+  GPS_FUENTE (.env) decide de quién acepta posiciones rastreo: "simulador" o "dispositivo".
+  PAGOS_PROVEEDOR (.env) escoge la pasarela: "wompi" o "falso".
+  No hay servicio de notificaciones: HU-14 está fuera del MVP.
+end legend
+@enduml

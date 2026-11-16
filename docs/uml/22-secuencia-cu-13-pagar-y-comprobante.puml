@@ -1,0 +1,65 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-13 Pagar con tarjeta o PSE y descargar el comprobante (HU-05)
+
+autonumber
+actor "Cliente" as cliente
+participant "frontend/" as front
+participant "alquileres/rutas.py\no ventas/rutas.py" as rutas_op
+participant "pagos/rutas.py" as rutas
+participant "pagos/procesamiento.py" as procesamiento
+participant "PasarelaPagos\n(PasarelaWompi o PasarelaFalsa)" as pasarela
+participant "pagos/comprobante.py" as comprobante
+participant "Wompi (sandbox)" as wompi
+database "PostgreSQL" as bd
+
+== Preparar el formulario de pago ==
+front -> rutas : GET /pagos/configuracion
+rutas -> pasarela : configuracion_publica()
+rutas --> front : 200 ConfiguracionPagos\n(métodos activos, llave pública, términos)
+opt el cliente escoge PSE
+  front -> rutas : GET /pagos/pse/bancos
+  rutas -> pasarela : bancos_pse()
+  rutas --> front : 200 lista de BancoPse
+end
+opt el cliente escoge tarjeta
+  front -> wompi : tokeniza la tarjeta\n(el número nunca llega al backend)
+  wompi --> front : token
+end
+
+== Cobro en tres pasos ==
+cliente -> front : paga
+front -> rutas_op : POST /alquileres/{alquiler_id}/pago\no POST /ventas/{venta_id}/pago
+rutas_op -> procesamiento : pagar()
+procesamiento -> bd : paso 1: preparar_pago() del módulo de la operación:\nINSERT pagos (pendiente) y commit
+procesamiento -> pasarela : paso 2: cobrar(SolicitudCobro),\nfuera de toda transacción
+pasarela -> wompi : HTTPS: crea la transacción\ncon firma_integridad()
+wompi --> pasarela : estado
+pasarela --> procesamiento : ResultadoCobro
+procesamiento -> procesamiento : paso 3: aplicar_resultado() (idempotente)
+procesamiento -> bd : UPDATE pagos y la operación; commit
+rutas_op --> front : 201 PagoAlquilerRespuesta\no PagoVentaRespuesta
+
+== Si quedó pendiente (PSE): consulta de respaldo ==
+loop cada pocos segundos, mientras siga pendiente
+  front -> rutas : GET /pagos/{referencia} + JWT
+  rutas -> procesamiento : ver() → obtener_pago()
+  rutas -> procesamiento : sincronizar()
+  procesamiento -> pasarela : consultar(referencia)
+  pasarela -> wompi : consulta la transacción\npor su referencia
+  procesamiento -> procesamiento : aplicar_resultado()
+  rutas --> front : 200 PagoDetalle
+end
+
+== Comprobante en PDF ==
+cliente -> front : descarga el comprobante
+front -> rutas : GET /pagos/{referencia}/comprobante + JWT
+rutas -> procesamiento : comprobante() → obtener_pago()\n(el cliente solo ve los suyos)
+rutas -> comprobante : datos_comprobante() y generar_pdf() (ReportLab)
+rutas --> front : 200 application/pdf
+
+note over cliente, bd
+  La confirmación que manda es la de Wompi (CU-14, webhook), no la del navegador.
+  El detalle del bloqueo de 15 minutos está en 07-secuencia-alquiler-pago.
+end note
+@enduml

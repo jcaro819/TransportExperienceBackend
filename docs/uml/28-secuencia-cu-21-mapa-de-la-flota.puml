@@ -1,0 +1,43 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-21 Ver el mapa de la flota y el recorrido (HU-08)
+
+autonumber
+actor "Administrador\nu operador" as usuario
+participant "frontend/\n(mapa)" as front
+participant "rastreo/rutas.py" as rutas
+participant "seguridad.py" as seguridad
+participant "rastreo/servicio.py" as servicio
+database "PostgreSQL" as bd
+
+usuario -> front : abre el mapa de la flota
+
+loop cada 5 segundos (consulta periódica, no WebSocket)
+  front -> rutas : GET /rastreo/flota + JWT\n(filtro opcional: senal)
+  rutas -> seguridad : AdministradorUOperador: requiere_roles()
+  rutas -> servicio : flota() → listar_flota()
+  servicio -> bd : SELECT vehículos con GPS + LATERAL de su última\nposición (índice vehiculo_id, registrado_en DESC)
+  servicio -> servicio : señal: "sin señal" si la última posición llegó\nhace más de segundos_sin_senal (30)
+  servicio --> rutas : VehiculoRastreado por cada vehículo
+  rutas --> front : 200 Pagina[VehiculoEnMapa]
+  front --> usuario : mueve los marcadores y muestra el estado de la señal
+end
+
+== Recorrido de un vehículo ==
+usuario -> front : selecciona un vehículo
+front -> rutas : GET /rastreo/vehiculos/{vehiculo_id}/recorrido + JWT\n(desde, hasta; por defecto, la última hora)
+rutas -> servicio : recorrido()
+alt rango al revés o anterior a los 7 días de historial
+  servicio --> rutas : RangoDeRecorridoInvalido
+else rango válido
+  servicio -> bd : SELECT posiciones_gps del vehículo en el rango
+  rutas --> front : 200 Pagina[PosicionRespuesta]
+  front --> usuario : dibuja la línea del recorrido
+end
+
+note over usuario, bd
+  Las posiciones las envía el simulador o el dispositivo GPS (CU-20, 10-secuencia-posicion-gps).
+  La señal se mide con la hora de llegada al servidor, no con el reloj del dispositivo.
+  Antes de reportar, el administrador emite la clave del vehículo: POST /rastreo/vehiculos/{vehiculo_id}/clave.
+end note
+@enduml

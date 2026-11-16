@@ -1,0 +1,50 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-05 Consultar el catálogo y la disponibilidad (HU-02)
+
+autonumber
+actor "Visitante o\ncliente" as cliente
+participant "frontend/" as front
+participant "inventario/rutas.py" as rutas
+participant "inventario/servicio.py" as servicio
+database "PostgreSQL" as bd
+
+== Catálogo con filtros ==
+cliente -> front : abre el catálogo y filtra por tipo o tarifa
+front -> rutas : GET /catalogo/tipos
+rutas -> servicio : listar_tipos()
+rutas --> front : 200 Pagina[TipoVehiculoRespuesta]
+front -> rutas : GET /catalogo/modelos\n(filtros y paginación)
+rutas -> servicio : listar_modelos()
+servicio -> servicio : consulta_unidades_libres(hoy, hoy, ...):\nlas unidades libres en este momento
+servicio -> bd : SELECT modelos activos + conteo de unidades libres
+alt rango de tarifa al revés
+  servicio --> rutas : RangoDeTarifaInvalido
+else filtros válidos
+  rutas --> front : 200 Pagina[ModeloCatalogo]\n(con las unidades disponibles)
+end
+
+== Vista detallada ==
+cliente -> front : abre un modelo
+front -> rutas : GET /catalogo/modelos/{modelo_id}
+rutas -> servicio : ver_modelo() → obtener_modelo()
+servicio -> bd : SELECT modelo y sus unidades libres hoy
+rutas --> front : 200 ModeloDetalle (unidades sin paginar)
+
+== Disponibilidad por fechas ==
+cliente -> front : escoge las fechas del alquiler
+front -> rutas : GET /catalogo/modelos/{modelo_id}/disponibilidad\n(fecha_inicio, fecha_fin)
+rutas -> servicio : consultar_disponibilidad()
+servicio -> bd : SELECT count de consulta_unidades_libres(inicio, fin, ...)
+rutas --> front : 200 DisponibilidadRango
+
+== Accesorios y repuestos ==
+front -> rutas : GET /catalogo/productos
+rutas -> servicio : listar_productos()
+rutas --> front : 200 Pagina[ProductoCatalogo]
+
+note over cliente, bd
+  Es público. La disponibilidad se calcula en cada consulta: una unidad inactivada,
+  reservada o alquilada deja de contarse al instante (no hay copia que sincronizar).
+end note
+@enduml
