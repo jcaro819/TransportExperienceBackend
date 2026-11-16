@@ -1105,9 +1105,11 @@ function rentalCard(rental) {
         ${rental.expira_en && rental.estado === "pendiente_pago"
           ? `<small>Reserva válida hasta ${escapeHtml(humanDateTime(rental.expira_en))}</small>`
           : ""}
+        ${callPanels("rentalDeliveryInfo", rental) || ""}
       </div>
       <div class="tx-rental-actions">
         ${canPay ? `<button class="btn btn-primary small-btn" data-pay-rental="${rental.id}">Pagar</button>` : ""}
+        ${callPanels("rentalDeliveryActions", rental) || ""}
         ${canCancel ? `<button class="outline-danger" data-cancel-rental="${rental.id}">Cancelar</button>` : ""}
       </div>
     </article>
@@ -1147,6 +1149,8 @@ function renderRentals() {
   list.querySelectorAll("[data-cancel-rental]").forEach(btn => {
     btn.addEventListener("click", () => cancelRental(Number(btn.dataset.cancelRental)));
   });
+
+  callPanels("bindDeliveryActions", list); // cliente.js: domicilio de la reserva
 }
 
 async function loadMyRentals() {

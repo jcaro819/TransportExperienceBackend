@@ -1,4 +1,4 @@
-// Pantallas del cliente: compra con carrito (HU-04). Se carga después de app.js y de
+// Pantallas del cliente: compra con carrito (HU-04) y domicilio (HU-06). Se carga después de app.js y de
 // paneles.js y reutiliza su cliente: api(), escapeHtml(), formatCOP(), humanDateTime(),
 // showToast(), handleExpiredSession(), state, y de paneles.js fetchAllPages(), postJson(),
 // downloadFile(), openPanelDialog(), handleDialogError(), runWithButton() y showPanelError().
@@ -10,6 +10,7 @@ const MAX_UNITS_PER_PRODUCT = 100;
 const shop = {
   products: [],
   sales: [],
+  deliveries: [],
   cart: readCart(),
 };
 
@@ -43,6 +44,9 @@ function injectClientStyles() {
     .tx-totals div{display:flex;justify-content:space-between;gap:12px}
     .tx-totals .tx-total-line{font-size:16px;font-weight:800;border-top:1px solid var(--line);padding-top:8px}
     .tx-receipt-note{font-size:11px;color:var(--muted);line-height:1.5}
+    .tx-delivery-map{height:280px;border:1px solid var(--line);border-radius:14px;margin:14px 0;isolation:isolate;background:var(--bg)}
+    .tx-delivery-line{display:block;color:var(--brand-dark)!important;font-weight:600}
+    .tx-availability strong{font-weight:800}
     @media(max-width:760px){
       .tx-cart-text{display:none}
       .tx-cart-summary{display:grid}
@@ -152,6 +156,7 @@ function syncClientUi() {
   syncCartBadge();
   if (!isClient()) {
     shop.sales = [];
+    shop.deliveries = [];
     const list = document.getElementById("txSalesList");
     if (list) list.innerHTML = "";
   }
@@ -484,9 +489,11 @@ function saleCard(sale) {
         <span>${plural(units, "artículo", "artículos")}${sale.valor_envio ? ` · incluye envío de ${formatCOP(sale.valor_envio)}` : ""}</span>
         ${sale.expira_en && pending ? `<small>Apartado hasta ${escapeHtml(humanDateTime(sale.expira_en))}</small>` : ""}
         ${sale.motivo_cancelacion ? `<small>Motivo: ${escapeHtml(sale.motivo_cancelacion)}</small>` : ""}
+        ${deliveryInfoHtml("venta", sale)}
       </div>
       <div class="tx-rental-actions">
         ${pending ? `<button class="btn btn-primary small-btn" data-pay-sale="${Number(sale.id)}">Pagar</button>` : ""}
+        ${deliveryActionsHtml("venta", sale)}
         <button class="btn btn-ghost small-btn" data-receipt-sale="${Number(sale.id)}">Comprobante</button>
         ${pending ? `<button class="outline-danger" data-cancel-sale="${Number(sale.id)}">Cancelar</button>` : ""}
       </div>
@@ -534,6 +541,7 @@ function renderSales() {
   list.querySelectorAll("[data-receipt-sale]").forEach(btn => {
     btn.addEventListener("click", () => openReceipt(Number(btn.dataset.receiptSale), btn));
   });
+  bindDeliveryActions(list);
 }
 
 // app.js lo llama al abrir "Mi cuenta", junto con loadMyRentals().
@@ -554,7 +562,11 @@ async function loadAccountExtras() {
   }
 
   try {
-    const sales = await fetchAllPages("/ventas/mias");
+    const [sales, deliveries] = await Promise.all([
+      fetchAllPages("/ventas/mias"),
+      fetchAllPages("/domicilios/mios"),
+    ]);
+    shop.deliveries = deliveries;
     shop.sales = sales.sort((a, b) => {
       const aPending = a.estado === "pendiente_pago" ? 0 : 1;
       const bPending = b.estado === "pendiente_pago" ? 0 : 1;
@@ -563,6 +575,8 @@ async function loadAccountExtras() {
     });
     hidePanelError(errorBox);
     renderSales();
+    // Las reservas las pinta app.js: se repintan para que muestren su domicilio.
+    if (state.rentals.length) renderRentals();
   } catch (error) {
     if (error.status === 401) handleExpiredSession();
     else showClientError(errorBox, error);
@@ -703,6 +717,232 @@ async function openReceipt(id, button) {
       }
     });
   });
+}
+
+// ---------------------------------------------------------
+// Domicilio (HU-06): se agrega a una reserva o compra antes de pagarla
+// ---------------------------------------------------------
+
+// El domicilio vigente de una operación ("alquiler" o "venta"), si tiene.
+function activeDelivery(kind, operationId) {
+  return shop.deliveries.find(d => d[`${kind}_id`] === operationId && d.estado !== "cancelado");
+}
+
+function deliveryInfoHtml(kind, operation) {
+  const delivery = activeDelivery(kind, operation.id);
+  if (!delivery) return "";
+  return `<small class="tx-delivery-line">🚚 Domicilio a ${escapeHtml(delivery.direccion)} (${escapeHtml(delivery.zona?.nombre)}) · envío ${formatCOP(delivery.valor_envio)} · código ${escapeHtml(delivery.codigo_rastreo)}</small>`;
+}
+
+// Solo antes de pagar: después el total ya está cobrado (decisión 1 del Sprint 3).
+function deliveryActionsHtml(kind, operation) {
+  if (!isClient() || operation.estado !== "pendiente_pago") return "";
+  const delivery = activeDelivery(kind, operation.id);
+  return delivery
+    ? `<button class="btn btn-ghost small-btn" data-remove-delivery="${Number(delivery.id)}">Quitar domicilio</button>`
+    : `<button class="btn btn-soft small-btn" data-add-delivery="${kind}" data-operation-id="${Number(operation.id)}">🚚 Domicilio</button>`;
+}
+
+// Ganchos que app.js usa al pintar las tarjetas de "Tus alquileres".
+function rentalDeliveryInfo(rental) {
+  return deliveryInfoHtml("alquiler", rental);
+}
+
+function rentalDeliveryActions(rental) {
+  return deliveryActionsHtml("alquiler", rental);
+}
+
+function bindDeliveryActions(root) {
+  root.querySelectorAll("[data-add-delivery]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const kind = btn.dataset.addDelivery;
+      const id = Number(btn.dataset.operationId);
+      const operation = (kind === "alquiler" ? state.rentals : shop.sales).find(o => o.id === id);
+      if (operation) openDeliveryDialog(kind, operation);
+    });
+  });
+  root.querySelectorAll("[data-remove-delivery]").forEach(btn => {
+    btn.addEventListener("click", () => removeDelivery(Number(btn.dataset.removeDelivery), btn));
+  });
+}
+
+async function reloadAccount() {
+  await loadAccountExtras();
+  await loadMyRentals();
+}
+
+function operationLabel(kind, operation) {
+  return kind === "alquiler" ? `la reserva #${Number(operation.id)}` : `la compra #${Number(operation.id)}`;
+}
+
+// El cliente marca el punto en un mapa Leaflet; GET /domicilios/cobertura dice la zona y la
+// tarifa, y POST /domicilios lo agrega y recalcula el total.
+function openDeliveryDialog(kind, operation) {
+  const content = openPanelDialog(`
+    <span class="eyebrow">DOMICILIO · HU-06</span>
+    <h2>¿Dónde lo entregamos?</h2>
+    <p>Marca el punto de entrega en el mapa para ${escapeHtml(operationLabel(kind, operation))}. Las zonas sombreadas son las de cobertura y cada una tiene su tarifa de envío.</p>
+    <div id="txDeliveryMap" class="tx-delivery-map" aria-label="Mapa para marcar el punto de entrega"></div>
+    <div id="txCoverage" class="tx-availability">Toca el mapa para marcar el punto de entrega.</div>
+    <form class="tx-reservation-form" id="txDeliveryForm">
+      <label>Dirección
+        <input name="direccion" minlength="5" maxlength="200" autocomplete="street-address" placeholder="Ej. Calle 36 # 19-20, apto 301" required>
+      </label>
+      <label>Indicaciones <small class="tx-optional">(opcional)</small>
+        <input name="indicaciones" maxlength="200" placeholder="Ej. Portería del edificio azul">
+      </label>
+      <div class="tx-totals">
+        <div><span>Subtotal</span><span>${formatCOP(operation.subtotal)}</span></div>
+        <div><span>Envío</span><span id="txDeliveryFee">Marca el punto</span></div>
+        <div class="tx-total-line"><span>Total</span><span id="txDeliveryTotal">${formatCOP(operation.subtotal)}</span></div>
+      </div>
+      <div class="tx-form-actions">
+        <button type="button" class="btn btn-ghost" data-dialog-cancel>Recoger en el local</button>
+        <button type="submit" class="btn btn-primary" id="txDeliverySubmit" disabled>Agregar domicilio</button>
+      </div>
+    </form>
+  `);
+
+  const coverageBox = content.querySelector("#txCoverage");
+  const feeText = content.querySelector("#txDeliveryFee");
+  const totalText = content.querySelector("#txDeliveryTotal");
+  const submit = content.querySelector("#txDeliverySubmit");
+  const form = content.querySelector("#txDeliveryForm");
+  const errorBox = content.querySelector("[data-dialog-error]");
+
+  let point = null; // { latitud, longitud } con 6 decimales, como texto
+  let coverage = null;
+  let requestVersion = 0;
+  let marker = null;
+
+  if (typeof L === "undefined") {
+    coverageBox.className = "tx-availability no";
+    coverageBox.textContent = "No se pudo cargar la librería del mapa (Leaflet). Revisa tu conexión a internet y recarga la página.";
+    return;
+  }
+
+  // zoomSnap fraccionario: así el encuadre de las zonas aprovecha todo el mapa del diálogo.
+  const map = L.map(content.querySelector("#txDeliveryMap"), { zoomSnap: 0.25 }).setView(BUCARAMANGA, 13);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+  // El diálogo acaba de abrirse: Leaflet necesita recalcular su tamaño.
+  setTimeout(() => map.invalidateSize(), 0);
+  dialog.addEventListener("close", () => {
+    requestVersion += 1;
+    map.remove();
+  }, { once: true });
+
+  drawCoverageZones(map, content);
+
+  async function setPoint(latlng) {
+    point = { latitud: latlng.lat.toFixed(6), longitud: latlng.lng.toFixed(6) };
+    coverage = null;
+    submit.disabled = true;
+    hidePanelError(errorBox);
+
+    if (marker) marker.setLatLng(latlng);
+    else marker = L.marker(latlng).addTo(map);
+
+    const currentVersion = ++requestVersion;
+    coverageBox.className = "tx-availability checking";
+    coverageBox.innerHTML = `<span class="tx-spinner" aria-hidden="true"></span><span>Consultando la cobertura de ese punto...</span>`;
+
+    try {
+      const data = await api(`/domicilios/cobertura?${new URLSearchParams(point)}`);
+      if (currentVersion !== requestVersion) return;
+
+      coverage = data;
+      const total = operation.subtotal + data.tarifa_envio;
+      coverageBox.className = "tx-availability ok";
+      coverageBox.innerHTML = `<strong>Sí llegamos: zona ${escapeHtml(data.zona)}.</strong> El envío cuesta ${formatCOP(data.tarifa_envio)} y el total queda en <strong>${formatCOP(total)}</strong>.`;
+      feeText.textContent = formatCOP(data.tarifa_envio);
+      totalText.textContent = formatCOP(total);
+      submit.disabled = false;
+    } catch (error) {
+      if (currentVersion !== requestVersion) return;
+      // Fuera de cobertura (422): el backend dice la causa y qué hacer.
+      coverageBox.className = "tx-availability no";
+      coverageBox.innerHTML = clientErrorHtml(error);
+      feeText.textContent = "Sin cobertura";
+      totalText.textContent = formatCOP(operation.subtotal);
+    }
+  }
+
+  map.on("click", e => setPoint(e.latlng));
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!point || !coverage || !form.reportValidity()) return;
+
+    await runWithButton(submit, "Agregando...", async () => {
+      try {
+        const delivery = await postJson("/domicilios", {
+          [`${kind}_id`]: operation.id,
+          direccion: form.elements.direccion.value.trim(),
+          indicaciones: form.elements.indicaciones.value.trim() || null,
+          latitud: point.latitud,
+          longitud: point.longitud,
+        });
+
+        dialog.close();
+        showToast(`Domicilio agregado (${delivery.zona?.nombre}). Envío ${formatCOP(delivery.valor_envio)}; el total ahora es ${formatCOP(delivery.total_operacion)}. Código de rastreo: ${delivery.codigo_rastreo}.`);
+        await reloadAccount();
+      } catch (error) {
+        if (error.status === 401) {
+          dialog.close();
+          handleExpiredSession();
+        } else {
+          showClientError(errorBox, error);
+        }
+      }
+    });
+  });
+}
+
+// Pinta las zonas de GET /domicilios/zonas (GeoJSON) para que se vea hasta dónde se entrega.
+async function drawCoverageZones(map, content) {
+  try {
+    const zones = await fetchPublicPages("/domicilios/zonas");
+    if (!content.isConnected || !zones.length) return;
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#16a36a";
+    const layers = zones.map(zone => L.geoJSON(zone.poligono, {
+      style: { color, weight: 2, fillOpacity: 0.18 },
+    }).bindTooltip(escapeHtml(`${zone.nombre} · envío ${formatCOP(zone.tarifa_envio)}`), { sticky: true }));
+
+    const group = L.featureGroup(layers).addTo(map);
+    // Con el tamaño real del diálogo, para que las zonas ocupen todo el mapa.
+    map.invalidateSize();
+    map.fitBounds(group.getBounds(), { padding: [12, 12] });
+  } catch (error) {
+    // Sin las zonas dibujadas el mapa sigue sirviendo: la cobertura se valida al marcar.
+    console.warn("No se pudieron dibujar las zonas de cobertura.", error);
+  }
+}
+
+// POST /domicilios/{id}/cancelacion: quita el domicilio antes de pagar y el total vuelve a bajar.
+async function removeDelivery(id, button) {
+  const delivery = shop.deliveries.find(d => d.id === id);
+  if (!delivery) return;
+
+  const confirmed = window.confirm(`Vas a quitar el domicilio a ${delivery.direccion}. El total queda sin los ${formatCOP(delivery.valor_envio)} del envío. ¿Continuar?`);
+  if (!confirmed) return;
+
+  await runWithButton(button, "Quitando...", async () => {
+    try {
+      const removed = await api(`/domicilios/${id}/cancelacion`, { method: "POST", auth: true });
+      showToast(`Domicilio quitado. El total ahora es ${formatCOP(removed.total_operacion)}.`);
+    } catch (error) {
+      if (error.status === 401) {
+        handleExpiredSession();
+        return;
+      }
+      showToast(error.message);
+    }
+  });
+  await reloadAccount();
 }
 
 // Si este archivo carga después del arranque de app.js, la interfaz se pone al día.
