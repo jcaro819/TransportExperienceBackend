@@ -22,7 +22,21 @@ function injectClientStyles() {
   style.textContent = `
     .tx-cart-button{white-space:nowrap;gap:6px}
     .nav a{white-space:nowrap}
-    @media(max-width:1500px){.nav{gap:20px}.header-actions .btn-primary{display:none}}
+    /* Con "Accesorios", "Seguir pedido" y el carrito, el encabezado necesita más ancho:
+       se compacta antes y pasa al menú ☰ (mismas reglas que styles.css usa bajo 1050px). */
+    @media(max-width:1500px){
+      .nav{gap:18px}
+      .site-header{gap:18px}
+      .header-actions .btn-primary,.tx-cart-text{display:none}
+    }
+    @media(max-width:1340px){
+      .nav{display:none}
+      .menu-toggle{display:block;margin-left:auto}
+      .nav.open{display:grid;position:absolute;top:78px;left:0;right:0;background:#fff;padding:16px 24px;box-shadow:var(--shadow)}
+      .nav.open a{padding:10px 0;border:0}
+      .header-actions{margin-left:auto}
+      .header-actions+.menu-toggle,.menu-toggle{order:3;margin-left:0}
+    }
     .tx-cart-button[hidden]{display:none}
     .tx-cart-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#fff;color:var(--brand-dark);font-size:10px;font-weight:800}
     .tx-product-desc{color:var(--muted);font-size:12px;line-height:1.5;margin:10px 0 0}
@@ -49,6 +63,7 @@ function injectClientStyles() {
     .tx-availability strong{font-weight:800}
     .tx-track-form{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;max-width:560px}
     .tx-track-form input{flex:1;min-width:200px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font:inherit;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#fff}
+    .tx-track-form input::placeholder{text-transform:none;font-weight:500;letter-spacing:0}
     .tx-track-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;max-width:640px;display:grid;gap:18px}
     .tx-track-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
     .tx-track-head small{color:var(--muted);font-size:12px}
@@ -66,9 +81,14 @@ function injectClientStyles() {
     .tx-track-steps strong,.tx-track-steps small{display:block}
     .tx-track-steps small{font-size:12px;margin-top:2px}
     @media(max-width:760px){
-      .tx-cart-text{display:none}
+      .site-header{gap:10px}
+      .nav.open{top:68px}
+      .header-actions{gap:6px}
+      .header-actions .btn{padding:9px 10px}
+      .tx-pending-text{display:none}
       .tx-cart-summary{display:grid}
     }
+    @media(max-width:520px){.brand>span:last-child{display:none}}
   `;
   document.head.appendChild(style);
 }

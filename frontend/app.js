@@ -195,7 +195,7 @@ function injectClientUi() {
   if (headerActions && !document.getElementById("txPendingShortcut")) {
     headerActions.insertAdjacentHTML("afterbegin", `
       <button class="btn btn-soft tx-pending-shortcut" id="txPendingShortcut" type="button" hidden>
-        💳 Pendientes <span id="txPendingShortcutCount">0</span>
+        💳 <em class="tx-pending-text">Pendientes</em> <span id="txPendingShortcutCount">0</span>
       </button>
     `);
   }
@@ -365,6 +365,8 @@ function injectClientUi() {
     .tx-account-button{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
     .tx-account-button span{font-size:16px;line-height:1}
     .tx-pending-shortcut{white-space:nowrap}
+    .tx-pending-shortcut[hidden]{display:none}
+    .tx-pending-text{font-style:normal}
     .tx-pending-shortcut span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:3px;border-radius:999px;background:#fff;color:#8a5900;font-size:10px;font-weight:800}
     .tx-availability.checking{display:flex;align-items:center;gap:10px;color:var(--muted)}
     .tx-spinner{width:18px;height:18px;border:2px solid rgba(18,86,61,.18);border-top-color:#12563d;border-radius:50%;animation:tx-spin .72s linear infinite;flex:0 0 auto}
