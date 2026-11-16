@@ -503,6 +503,7 @@ function showView(name) {
   }
   if (name === "accesorios") callPanels("loadShop"); // cliente.js
   if (name === "carrito") callPanels("renderCart"); // cliente.js
+  if (name === "seguimiento") callPanels("loadTracking"); // cliente.js
   if (name === "admin") loadAdminData();
   if (name === "entregas") callPanels("loadCourierPanel"); // paneles.js
   if (name === "mis-actas") callPanels("loadMyActas"); // paneles.js
@@ -1470,7 +1471,7 @@ async function init() {
   updateSessionUi();
 
   const initial = location.hash.replace("#", "");
-  const allowed = ["inicio", "catalogo", "login", "registro", "admin", "cuenta", "entregas", "mis-actas", "accesorios", "carrito"];
+  const allowed = ["inicio", "catalogo", "login", "registro", "admin", "cuenta", "entregas", "mis-actas", "accesorios", "carrito", "seguimiento"];
   const target = allowed.includes(initial) ? initial : "inicio";
 
   if (target === "admin" && !["administrador", "operador"].includes(state.user?.rol)) {

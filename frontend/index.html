@@ -26,6 +26,7 @@
       <a href="#inicio" data-view-link="inicio" class="active">Inicio</a>
       <a href="#catalogo" data-view-link="catalogo">Catálogo</a>
       <a href="#accesorios" data-view-link="accesorios">Accesorios</a>
+      <a href="#seguimiento" data-view-link="seguimiento">Seguir pedido</a>
       <a href="#como-funciona" data-anchor-link="como-funciona">Cómo funciona</a>
       <a href="#contacto" data-anchor-link="contacto">Contacto</a>
       <a href="#mis-actas" data-view-link="mis-actas" data-roles="cliente" hidden>Mis actas</a>
@@ -77,7 +78,7 @@
         <div class="service-grid">
           <article class="service-card"><span class="service-icon">🚲</span><h3>Alquila</h3><p>Consulta vehículos disponibles y elige el que mejor se ajuste a tu recorrido.</p><button data-view-button="catalogo">Ver alquileres →</button></article>
           <article class="service-card"><span class="service-icon">🛼</span><h3>Compra</h3><p>Explora dispositivos y accesorios disponibles para venta desde el catálogo.</p><button data-view-button="accesorios">Ver productos →</button></article>
-          <article class="service-card"><span class="service-icon">📦</span><h3>Domicilios</h3><p>Solicita la entrega de un vehículo o producto dentro de las zonas habilitadas.</p><button class="coming-soon">Próximamente</button></article>
+          <article class="service-card"><span class="service-icon">📦</span><h3>Domicilios</h3><p>Solicita la entrega de un vehículo o producto dentro de las zonas habilitadas.</p><button data-view-button="seguimiento">Seguir mi pedido →</button></article>
         </div>
       </section>
 
@@ -152,6 +153,18 @@
         <div id="txCartError" class="tx-availability no tx-panel-error" hidden></div>
         <div id="txCartList" class="tx-rentals-list"></div>
         <div id="txCartSummary" class="tx-cart-summary" hidden></div>
+      </section>
+    </section>
+
+    <section class="view" id="view-seguimiento" data-view="seguimiento">
+      <section class="page-hero compact">
+        <div><span class="eyebrow">SEGUIMIENTO · HU-07</span><h1>Sigue tu pedido</h1><p>Escribe el código de rastreo de tu domicilio (empieza por TX-). No necesitas iniciar sesión: solo se muestran el estado y la hora de cada cambio.</p>
+          <form class="tx-track-form" id="txTrackForm"><input id="txTrackCode" maxlength="40" placeholder="Ej. TX-ABCD1234" autocomplete="off" aria-label="Código de rastreo" required><button class="btn btn-primary" id="txTrackButton" type="submit">Consultar</button></form>
+        </div>
+      </section>
+      <section class="section tx-rentals-section">
+        <div id="txTrackError" class="tx-availability no tx-panel-error" hidden></div>
+        <div id="txTrackResult"></div>
       </section>
     </section>
 

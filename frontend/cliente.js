@@ -1,4 +1,4 @@
-// Pantallas del cliente: compra con carrito (HU-04) y domicilio (HU-06). Se carga después de app.js y de
+// Pantallas del cliente: compra con carrito (HU-04), domicilio (HU-06) y seguimiento (HU-07). Se carga después de app.js y de
 // paneles.js y reutiliza su cliente: api(), escapeHtml(), formatCOP(), humanDateTime(),
 // showToast(), handleExpiredSession(), state, y de paneles.js fetchAllPages(), postJson(),
 // downloadFile(), openPanelDialog(), handleDialogError(), runWithButton() y showPanelError().
@@ -47,6 +47,24 @@ function injectClientStyles() {
     .tx-delivery-map{height:280px;border:1px solid var(--line);border-radius:14px;margin:14px 0;isolation:isolate;background:var(--bg)}
     .tx-delivery-line{display:block;color:var(--brand-dark)!important;font-weight:600}
     .tx-availability strong{font-weight:800}
+    .tx-track-form{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;max-width:560px}
+    .tx-track-form input{flex:1;min-width:200px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font:inherit;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#fff}
+    .tx-track-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;max-width:640px;display:grid;gap:18px}
+    .tx-track-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+    .tx-track-head small{color:var(--muted);font-size:12px}
+    .tx-track-head h3{margin:4px 0 0;font-size:24px;letter-spacing:.03em}
+    .tx-track-steps{list-style:none;margin:0;padding:0;display:grid}
+    .tx-track-steps li{display:grid;grid-template-columns:22px 1fr;gap:14px;padding-bottom:20px;position:relative;color:var(--muted)}
+    .tx-track-steps li:last-child{padding-bottom:0}
+    .tx-track-steps li:not(:last-child)::before{content:"";position:absolute;left:10px;top:20px;bottom:-2px;width:2px;background:var(--line)}
+    .tx-track-steps li.done:not(:last-child)::before{background:var(--brand)}
+    .tx-track-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:#fff;position:relative;z-index:1}
+    .tx-track-steps li.done .tx-track-dot{background:var(--brand);border-color:var(--brand)}
+    .tx-track-steps li.current .tx-track-dot{box-shadow:0 0 0 5px rgba(22,163,106,.18)}
+    .tx-track-steps li.off .tx-track-dot{background:var(--danger);border-color:var(--danger);box-shadow:none}
+    .tx-track-steps li.done strong{color:var(--ink)}
+    .tx-track-steps strong,.tx-track-steps small{display:block}
+    .tx-track-steps small{font-size:12px;margin-top:2px}
     @media(max-width:760px){
       .tx-cart-text{display:none}
       .tx-cart-summary{display:grid}
@@ -157,8 +175,10 @@ function syncClientUi() {
   if (!isClient()) {
     shop.sales = [];
     shop.deliveries = [];
-    const list = document.getElementById("txSalesList");
-    if (list) list.innerHTML = "";
+    ["txSalesList", "txDeliveriesList"].forEach(id => {
+      const list = document.getElementById(id);
+      if (list) list.innerHTML = "";
+    });
   }
 }
 
@@ -511,6 +531,10 @@ function ensureAccountSections() {
       <div id="txSalesError" class="tx-availability no tx-panel-error" hidden></div>
       <div id="txSalesList" class="tx-rentals-list"></div>
     </section>
+    <section class="section tx-rentals-section tx-account-block" id="txDeliveriesSection">
+      <div class="section-heading"><div><span class="eyebrow">DOMICILIOS · HU-07</span><h2>Tus domicilios</h2></div><p>Sigue cada entrega con su código de rastreo: pendiente, asignado, recogido, en camino y entregado.</p></div>
+      <div id="txDeliveriesList" class="tx-rentals-list"></div>
+    </section>
   `);
   document.getElementById("txRefreshRentals")?.addEventListener("click", loadAccountExtras);
 }
@@ -553,6 +577,7 @@ async function loadAccountExtras() {
 
   if (!isClient()) {
     list.innerHTML = "";
+    document.getElementById("txDeliveriesList").innerHTML = "";
     return;
   }
 
@@ -575,6 +600,7 @@ async function loadAccountExtras() {
     });
     hidePanelError(errorBox);
     renderSales();
+    renderDeliveries();
     // Las reservas las pinta app.js: se repintan para que muestren su domicilio.
     if (state.rentals.length) renderRentals();
   } catch (error) {
@@ -945,9 +971,166 @@ async function removeDelivery(id, button) {
   await reloadAccount();
 }
 
+// ---------------------------------------------------------
+// Seguimiento (HU-07): consulta pública por código y "Tus domicilios"
+// ---------------------------------------------------------
+
+const TRACK_KEY = "transport_track";
+const TRACK_STEPS = ["pendiente", "asignado", "recogido", "en_camino", "entregado"];
+
+function deliveryStatusClass(status = "") {
+  if (status === "entregado") return "tx-status-ok";
+  if (status === "cancelado") return "tx-status-off";
+  return "tx-status-pending";
+}
+
+function deliveryCard(delivery) {
+  const origin = delivery.alquiler_id != null
+    ? `la reserva #${Number(delivery.alquiler_id)}`
+    : `la compra #${Number(delivery.venta_id)}`;
+
+  return `
+    <article class="tx-rental-card" data-delivery-id="${Number(delivery.id)}" data-delivery-status="${escapeHtml(delivery.estado)}">
+      <div class="tx-rental-main">
+        <div class="tx-rental-icon">📦</div>
+        <div>
+          <small>Domicilio de ${origin} · ${escapeHtml(humanDateTime(delivery.creado_en))}</small>
+          <h3>${escapeHtml(delivery.codigo_rastreo)}</h3>
+          <span class="tx-status ${deliveryStatusClass(delivery.estado)}">${escapeHtml(deliveryStatusLabel(delivery.estado))}</span>
+        </div>
+      </div>
+      <div class="tx-rental-dates">
+        <strong>${escapeHtml(delivery.direccion)}</strong>
+        <span>Zona ${escapeHtml(delivery.zona?.nombre)} · envío ${formatCOP(delivery.valor_envio)}</span>
+        ${delivery.indicaciones ? `<small>${escapeHtml(delivery.indicaciones)}</small>` : ""}
+        ${delivery.domiciliario ? `<small>Lo lleva ${escapeHtml(delivery.domiciliario.nombre_completo)}</small>` : ""}
+        ${delivery.motivo_cancelacion ? `<small>Motivo: ${escapeHtml(delivery.motivo_cancelacion)}</small>` : ""}
+      </div>
+      <div class="tx-rental-actions">
+        <button class="btn btn-primary small-btn" data-track-delivery="${escapeHtml(delivery.codigo_rastreo)}">Ver seguimiento</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderDeliveries() {
+  const list = document.getElementById("txDeliveriesList");
+  if (!list) return;
+
+  if (!shop.deliveries.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div>📦</div>
+        <h3>Aún no tienes domicilios</h3>
+        <p>Puedes pedir el domicilio de una reserva o de una compra mientras está pendiente de pago.</p>
+      </div>`;
+    return;
+  }
+
+  const sorted = [...shop.deliveries].sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+  list.innerHTML = sorted.map(deliveryCard).join("");
+  list.querySelectorAll("[data-track-delivery]").forEach(btn => {
+    btn.addEventListener("click", () => openTracking(btn.dataset.trackDelivery));
+  });
+}
+
+// Abre la vista de seguimiento con un código ya consultado (desde "Tus domicilios").
+function openTracking(code) {
+  document.getElementById("txTrackCode").value = code;
+  rememberTrackCode(code);
+  history.replaceState(null, "", "#seguimiento");
+  showView("seguimiento"); // showView llama a loadTracking()
+}
+
+function rememberTrackCode(code) {
+  try {
+    sessionStorage.setItem(TRACK_KEY, code);
+  } catch (error) {
+    console.warn("No se pudo recordar el código de rastreo.", error);
+  }
+}
+
+// app.js lo llama al abrir la vista "seguimiento": retoma el último código consultado.
+function loadTracking() {
+  const input = document.getElementById("txTrackCode");
+  if (!input) return;
+
+  if (!input.value) {
+    try {
+      input.value = sessionStorage.getItem(TRACK_KEY) || "";
+    } catch {
+      input.value = "";
+    }
+  }
+  if (input.value.trim()) trackOrder();
+}
+
+function trackStepsHtml(tracking) {
+  // Hora del cambio a cada estado (la más reciente, si un estado se repitiera).
+  const times = new Map((tracking.cambios || []).map(change => [change.estado, change.en]));
+  const reached = TRACK_STEPS.filter(step => times.has(step));
+  const cancelled = tracking.estado === "cancelado";
+  const steps = cancelled ? [...reached, "cancelado"] : TRACK_STEPS;
+
+  return steps.map(step => {
+    const done = times.has(step) || step === tracking.estado;
+    const current = step === tracking.estado;
+    return `
+      <li class="${done ? "done" : ""} ${current ? "current" : ""} ${step === "cancelado" ? "off" : ""}" data-track-step="${escapeHtml(step)}">
+        <span class="tx-track-dot" aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(deliveryStatusLabel(step))}</strong>
+          <small>${times.has(step) ? escapeHtml(humanDateTime(times.get(step))) : "Aún no"}</small>
+        </div>
+      </li>
+    `;
+  }).join("");
+}
+
+// GET /domicilios/rastreo/{codigo}: público; solo el estado y la hora de cada cambio.
+async function trackOrder() {
+  const input = document.getElementById("txTrackCode");
+  const button = document.getElementById("txTrackButton");
+  const result = document.getElementById("txTrackResult");
+  const errorBox = document.getElementById("txTrackError");
+  const code = input.value.trim().toUpperCase();
+  if (!code) return;
+  input.value = code;
+
+  hidePanelError(errorBox);
+  await runWithButton(button, "Consultando...", async () => {
+    try {
+      const tracking = await api(`/domicilios/rastreo/${encodeURIComponent(code)}`);
+      rememberTrackCode(tracking.codigo_rastreo);
+      result.innerHTML = `
+        <article class="tx-track-card" data-track-status="${escapeHtml(tracking.estado)}">
+          <div class="tx-track-head">
+            <div>
+              <small>Código de rastreo</small>
+              <h3>${escapeHtml(tracking.codigo_rastreo)}</h3>
+            </div>
+            <span class="tx-status ${deliveryStatusClass(tracking.estado)}">${escapeHtml(deliveryStatusLabel(tracking.estado))}</span>
+          </div>
+          <ol class="tx-track-steps">${trackStepsHtml(tracking)}</ol>
+          <small class="tx-receipt-note">Consultado el ${escapeHtml(humanDateTime(new Date()))}. Vuelve a pulsar "Consultar" para actualizar. Por privacidad, aquí no se muestran la dirección ni los datos de quien recibe.</small>
+        </article>
+      `;
+    } catch (error) {
+      result.innerHTML = "";
+      showClientError(errorBox, error);
+    }
+  });
+}
+
+document.getElementById("txTrackForm")?.addEventListener("submit", e => {
+  e.preventDefault();
+  trackOrder();
+});
+
 // Si este archivo carga después del arranque de app.js, la interfaz se pone al día.
 ensureAccountSections();
 syncClientUi();
 if (document.getElementById("view-cuenta")?.classList.contains("active")) loadAccountExtras();
 if (document.getElementById("view-accesorios")?.classList.contains("active")) loadShop();
 if (document.getElementById("view-carrito")?.classList.contains("active")) renderCart();
+if (document.getElementById("view-seguimiento")?.classList.contains("active")) loadTracking();
