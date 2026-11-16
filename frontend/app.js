@@ -497,7 +497,12 @@ function showView(name) {
   window.scrollTo({ top: 0, behavior: "auto" });
 
   if (name === "catalogo") refreshCatalog();
-  if (name === "cuenta") loadMyRentals();
+  if (name === "cuenta") {
+    loadMyRentals();
+    callPanels("loadAccountExtras"); // cliente.js
+  }
+  if (name === "accesorios") callPanels("loadShop"); // cliente.js
+  if (name === "carrito") callPanels("renderCart"); // cliente.js
   if (name === "admin") loadAdminData();
   if (name === "entregas") callPanels("loadCourierPanel"); // paneles.js
   if (name === "mis-actas") callPanels("loadMyActas"); // paneles.js
@@ -560,6 +565,7 @@ function focusFirstPendingRental() {
 
 function updateSessionUi() {
   callPanels("syncRoleLinks"); // paneles.js
+  callPanels("syncClientUi"); // cliente.js
   if (!headerLoginButton) return;
 
   if (!state.user) {
@@ -849,6 +855,7 @@ async function openVehicle(id) {
     if (raw.se_alquila) {
       setupReservationForm(model);
     }
+    callPanels("decorateVehicleDialog", model, raw); // cliente.js: compra del modelo
   } catch (error) {
     showToast(error.message);
   }
@@ -1459,7 +1466,7 @@ async function init() {
   updateSessionUi();
 
   const initial = location.hash.replace("#", "");
-  const allowed = ["inicio", "catalogo", "login", "registro", "admin", "cuenta", "entregas", "mis-actas"];
+  const allowed = ["inicio", "catalogo", "login", "registro", "admin", "cuenta", "entregas", "mis-actas", "accesorios", "carrito"];
   const target = allowed.includes(initial) ? initial : "inicio";
 
   if (target === "admin" && !["administrador", "operador"].includes(state.user?.rol)) {
