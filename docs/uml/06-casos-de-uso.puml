@@ -1,0 +1,96 @@
+@startuml
+!include estilo.iuml
+title Diagrama de casos de uso — TransportExperience (MVP: HU-01 a HU-12)
+
+left to right direction
+
+actor "Cliente" as cliente
+actor "Domiciliario" as domiciliario
+actor "Operador" as operador
+actor "Administrador" as administrador
+actor "Wompi (sandbox)" as wompi <<sistema externo>>
+actor "Simulador o\ndispositivo GPS" as gps <<sistema externo>>
+
+rectangle "TransportExperience (MVP)" {
+  usecase "CU-01 Consultar el portal\ninstitucional y los horarios\n<size:10><i>portal</i></size>" as CU01
+  usecase "CU-02 Editar secciones\ny horarios del portal\n<size:10><i>portal</i></size>" as CU02
+  usecase "CU-03 Registrarse\ne iniciar sesión\n<size:10><i>usuarios</i></size>" as CU03
+  usecase "CU-04 Gestionar usuarios\ny roles\n<size:10><i>usuarios</i></size>" as CU04
+  usecase "CU-05 Consultar el catálogo\ny la disponibilidad\n<size:10><i>inventario</i></size>" as CU05
+  usecase "CU-06 Inactivar una unidad\ny gestionar novedades\n<size:10><i>inventario</i></size>" as CU06
+  usecase "CU-07 Gestionar el inventario\ny ajustar el stock\n<size:10><i>inventario</i></size>" as CU07
+  usecase "CU-08 Consultar las alertas\nde bajo stock\n<size:10><i>inventario</i></size>" as CU08
+  usecase "CU-09 Reservar un alquiler\n(bloqueo de 15 minutos)\n<size:10><i>alquileres</i></size>" as CU09
+  usecase "CU-10 Entregar y recibir\nel vehículo en el local\n<size:10><i>alquileres</i></size>" as CU10
+  usecase "CU-11 Reasignar o cancelar\ncon devolución\n<size:10><i>alquileres</i></size>" as CU11
+  usecase "CU-12 Comprar vehículos\ny accesorios\n<size:10><i>ventas</i></size>" as CU12
+  usecase "CU-13 Pagar con tarjeta o PSE\ny descargar el comprobante\n<size:10><i>pagos</i></size>" as CU13
+  usecase "CU-14 Confirmar el pago\n(webhook)\n<size:10><i>pagos</i></size>" as CU14
+  usecase "CU-15 Gestionar las\ndevoluciones pendientes\n<size:10><i>pagos</i></size>" as CU15
+  usecase "CU-16 Solicitar un domicilio\n<size:10><i>domicilios</i></size>" as CU16
+  usecase "CU-17 Asignar el domiciliario\n<size:10><i>domicilios</i></size>" as CU17
+  usecase "CU-18 Actualizar el estado\nde la entrega\n<size:10><i>domicilios</i></size>" as CU18
+  usecase "CU-19 Seguir el domicilio\n(código de rastreo)\n<size:10><i>domicilios</i></size>" as CU19
+  usecase "CU-20 Reportar la posición GPS\n<size:10><i>rastreo</i></size>" as CU20
+  usecase "CU-21 Ver el mapa de la flota\ny el recorrido\n<size:10><i>rastreo</i></size>" as CU21
+  usecase "CU-22 Consultar y exportar\nactas (PDF y Excel)\n<size:10><i>reportes</i></size>" as CU22
+  usecase "CU-23 Dar conformidad\na un acta\n<size:10><i>reportes</i></size>" as CU23
+}
+
+rectangle "Fuera del MVP (backlog futuro: no está en el código)" {
+  usecase "HU-13 Calificar y reseñar\nel servicio" as HU13 <<fuera del MVP>>
+  usecase "HU-14 Alertas automáticas\npor SMS o correo" as HU14 <<fuera del MVP>>
+}
+
+cliente --> CU01
+cliente --> CU03
+cliente --> CU05
+cliente --> CU09
+cliente --> CU12
+cliente --> CU13
+cliente --> CU16
+cliente --> CU19
+cliente --> CU23
+
+domiciliario --> CU03
+domiciliario --> CU18
+domiciliario --> CU06
+
+administrador --> CU02
+administrador --> CU03
+administrador --> CU04
+administrador --> CU06
+administrador --> CU07
+administrador --> CU08
+administrador --> CU10
+administrador --> CU11
+administrador --> CU15
+administrador --> CU17
+administrador --> CU21
+administrador --> CU22
+
+operador --> CU03
+operador --> CU06
+operador --> CU08
+operador --> CU10
+operador --> CU17
+operador --> CU18
+operador --> CU21
+operador --> CU22
+
+wompi --> CU13
+wompi --> CU14
+gps --> CU20
+
+CU09 ..> CU13 : <<include>>
+CU12 ..> CU13 : <<include>>
+CU16 ..> CU09 : <<extend>>
+CU16 ..> CU12 : <<extend>>
+
+legend right
+  Debajo de cada caso de uso, en cursiva: la carpeta de app/modulos/ que lo implementa.
+  CU-01, CU-05 y CU-19 son públicos: no exigen iniciar sesión.
+  En CU-06, el domiciliario solo reporta novedades de la unidad de su entrega en ruta.
+  HU-13 y HU-14 están fuera del MVP: no existen en el código.
+end legend
+@enduml

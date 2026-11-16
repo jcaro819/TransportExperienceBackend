@@ -1,0 +1,44 @@
+@startuml
+!include estilo.iuml
+title Secuencia — Reportar la posición GPS y verla en el mapa (HU-08)
+
+autonumber
+participant "simulador_gps/simulador.py\n(o un dispositivo GPS real)" as simulador
+participant "usuarios/rutas.py" as rutas_usuarios
+participant "rastreo/rutas.py" as rutas
+participant "rastreo/servicio.py" as servicio
+database "PostgreSQL" as bd
+actor "Administrador\nu operador" as personal
+
+== Preparación (una vez por vehículo) ==
+simulador -> rutas_usuarios : Simulador.iniciar_sesion():\nPOST /autenticacion/token
+rutas_usuarios --> simulador : access_token (JWT de administrador)
+simulador -> rutas : Simulador.preparar():\nPOST /rastreo/vehiculos/{vehiculo_id}/clave {fuente: "simulador"}
+rutas -> servicio : emitir_clave()
+servicio -> bd : guarda solo el SHA-256 en vehiculos.hash_clave_gps\n(más fuente_gps y clave_gps_emitida_en)
+rutas --> simulador : 201 ClaveGpsEmitida (la clave se muestra una sola vez)
+
+== Reporte de posiciones ==
+loop cada 5 segundos, por cada vehículo (Simulador.enviar_posiciones())
+  simulador -> simulador : VehiculoSimulado.avanzar(intervalo)
+  simulador -> rutas : POST /rastreo/posiciones\nencabezado X-Clave-Gps (sin JWT)\n{latitud, longitud, velocidad_kmh, ...}
+  rutas -> servicio : _vehiculo_del_dispositivo() →\nvehiculo_por_clave() (busca por hash_clave())
+  rutas -> servicio : reportar_posicion() →\nregistrar_posicion(sesion, vehiculo, datos, fuente)
+  servicio -> servicio : la fuente del vehículo debe ser GPS_FUENTE;\nhora ni futura ni de más de 7 días;\ncoordenadas a 6 decimales
+  servicio -> bd : INSERT posiciones_gps\n(no toca la fila del vehículo); commit
+  rutas --> simulador : 201 PosicionRecibida
+end
+
+== Mapa de la flota ==
+loop cada 5 segundos (consulta periódica; sin WebSocket)
+  personal -> rutas : GET /rastreo/flota + JWT
+  rutas -> servicio : flota() → listar_flota()
+  servicio -> bd : última posición de cada vehículo (LATERAL ...\nORDER BY registrado_en DESC LIMIT 1)
+  servicio --> rutas : VehiculoRastreado: en_linea, sin_senal\n(más de segundos_sin_senal = 30) o sin_datos
+  rutas --> personal : 200 Pagina[VehiculoEnMapa]
+end
+
+personal -> rutas : GET /rastreo/vehiculos/{vehiculo_id}/recorrido
+rutas -> servicio : recorrido()
+rutas --> personal : 200 Pagina[PosicionRespuesta] (última hora por defecto)
+@enduml

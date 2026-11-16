@@ -1,0 +1,66 @@
+@startuml
+!include estilo.iuml
+title Secuencia — Solicitar y seguir un domicilio (HU-06 y HU-07)
+
+autonumber
+actor "Cliente" as cliente
+actor "Operador o\nadministrador" as operador
+actor "Domiciliario" as domiciliario
+participant "domicilios/rutas.py" as rutas
+participant "domicilios/servicio.py" as servicio
+participant "domicilios/geometria.py" as geometria
+participant "alquileres/servicio.py" as alquileres
+participant "reportes/registro.py" as registro
+database "PostgreSQL" as bd
+
+== Solicitud (con la reserva o la compra en pendiente_pago) ==
+cliente -> rutas : GET /domicilios/cobertura (latitud, longitud)
+rutas -> servicio : zona_para_punto()
+servicio -> geometria : punto_en_poligono() por cada zona activa
+rutas --> cliente : 200 Cobertura (zona y tarifa_envio)\no 422 fuera_de_cobertura
+
+cliente -> rutas : POST /domicilios\n{alquiler_id | venta_id, direccion,\nlatitud, longitud} + JWT
+rutas -> servicio : solicitar_domicilio()
+servicio -> servicio : zona_para_punto(), _operacion_del_cliente()\ny domicilio_vigente()
+servicio -> bd : INSERT domicilios (codigo_rastreo,\nestado = pendiente) e historial_estados_domicilio
+servicio -> bd : _cambiar_envio(): valor_envio = tarifa de la zona,\ntotal = subtotal + valor_envio; commit
+rutas --> cliente : 201 DomicilioRespuesta (codigo_rastreo, total_operacion)
+
+note over cliente, bd
+  El cliente paga el total con el envío incluido
+  (ver 07-secuencia-alquiler-pago o 08-secuencia-compra).
+end note
+
+== Asignación manual (operación ya pagada) ==
+operador -> rutas : GET /domicilios/domiciliarios-disponibles
+rutas --> operador : domiciliarios activos sin entregas en ruta
+operador -> rutas : POST /domicilios/{domicilio_id}/asignacion\n{domiciliario_id, vehiculo_transporte_id}
+rutas -> servicio : asignar_domiciliario()
+servicio -> bd : bloquea vehículo, domiciliario y domicilio\n(SELECT ... FOR UPDATE, en ese orden)
+servicio -> bd : domicilio: pendiente → asignado;\nvehículo de transporte → asignado_a_domicilio; commit
+rutas --> operador : 200 DomicilioRespuesta
+
+== Entrega ==
+domiciliario -> rutas : GET /domicilios/asignados
+rutas --> domiciliario : sus entregas y su vehiculo_transporte
+
+loop recogido → en_camino → entregado (sin saltar pasos)
+  domiciliario -> rutas : POST /domicilios/{domicilio_id}/estado {estado}
+  rutas -> servicio : avanzar_estado()
+  servicio -> servicio : _bloquear_entrega() y validar_transicion()
+  opt estado = entregado
+    servicio -> alquileres : poner_en_curso(): alquiler → en_curso,\nunidad → alquilado (si es un alquiler)
+    servicio -> registro : registrar_acta(TipoActa.ENTREGA, ...)
+    servicio -> servicio : _liberar_transporte()
+  end
+  servicio -> bd : cambiar_estado_domicilio(): nuevo estado e\nhistorial_estados_domicilio; commit
+  rutas --> domiciliario : 200 DomicilioRespuesta
+end
+
+== Seguimiento ==
+cliente -> rutas : GET /domicilios/mios
+rutas --> cliente : sus domicilios con el estado actual
+cliente -> rutas : GET /domicilios/rastreo/{codigo}\n(público, sin iniciar sesión)
+rutas -> servicio : rastreo_publico()
+rutas --> cliente : 200 RastreoPublico: solo codigo_rastreo,\nestado y la hora de cada cambio
+@enduml

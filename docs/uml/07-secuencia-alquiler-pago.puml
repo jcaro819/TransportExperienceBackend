@@ -1,0 +1,77 @@
+@startuml
+!include estilo.iuml
+title Secuencia — Reservar y pagar un alquiler (HU-03 y HU-05)
+
+autonumber
+actor "Cliente" as cliente
+participant "frontend\n(app.js)" as front
+participant "alquileres/rutas.py" as rutas
+participant "alquileres/servicio.py" as servicio
+participant "pagos/procesamiento.py" as procesamiento
+participant "pagos/servicio.py" as pagos
+participant "PasarelaPagos\n(PasarelaWompi\no PasarelaFalsa)" as pasarela
+database "PostgreSQL" as bd
+participant "pagos/rutas.py" as rutas_pagos
+participant "Wompi\n(sandbox)" as wompi
+
+== Reserva con bloqueo de 15 minutos ==
+cliente -> front : escoge el modelo y las fechas
+front -> rutas : POST /alquileres\n{modelo_id, fecha_inicio, fecha_fin} + JWT
+rutas -> servicio : crear_alquiler(sesion, cliente,\nmodelo_id, fecha_inicio, fecha_fin)
+servicio -> servicio : validar_fechas() (máximo: max_dias_alquiler)
+servicio -> bd : _bloquear_unidades_del_modelo():\nSELECT ... FOR UPDATE de las unidades, por id
+servicio -> bd : bloquear_y_expirar() y expirar_vencidos():\nlos pendientes vencidos pasan a "expirado"
+servicio -> servicio : _libres_entre() y calcular_subtotal()
+servicio -> bd : INSERT alquileres (estado = pendiente_pago,\nexpira_en = ahora + MINUTOS_BLOQUEO (15))
+note right of bd
+  La restricción ex_alquileres_sin_solapamiento
+  rechaza dos alquileres activos de la misma
+  unidad con fechas que se crucen.
+end note
+servicio -> bd : registrar_auditoria() y commit
+servicio --> rutas : Alquiler
+rutas --> front : 201 AlquilerRespuesta (con expira_en)
+
+== Pago ==
+cliente -> front : paga con tarjeta o PSE
+front -> rutas : POST /alquileres/{alquiler_id}/pago\n{metodo_pago, tarjeta.token | pse}
+rutas -> procesamiento : pagar(sesion, cliente, datos,\npasarela, alquiler_id=...)
+procesamiento -> servicio : preparar_pago()
+servicio -> pagos : crear_cobro_pendiente()
+pagos -> bd : INSERT pagos (estado = pendiente)
+servicio -> bd : expira_en se extiende hasta\nmax_minutos_pago_pendiente (60); commit
+procesamiento -> pasarela : cobrar(SolicitudCobro)
+pasarela -> wompi : HTTPS: crea la transacción\n(firma de integridad)
+wompi --> pasarela : estado de la transacción
+pasarela --> procesamiento : ResultadoCobro
+procesamiento -> procesamiento : aplicar_resultado()
+procesamiento -> servicio : aplicar_resultado_pago()
+servicio -> pagos : registrar_resultado() (idempotente)
+
+alt pago aprobado
+  servicio -> bd : alquiler: pendiente_pago → confirmado; commit
+else rechazado, expirado o error
+  servicio -> bd : _restaurar_bloqueo(): vuelve el plazo original\nde 15 minutos (si ya pasó: expirado)
+else sigue pendiente (PSE o Wompi no respondió)
+  servicio -> bd : nada cambia; la reserva no vence todavía
+end
+rutas --> front : 201 PagoAlquilerRespuesta (alquiler y pago)
+
+== Si el pago quedó pendiente: la verdad la da Wompi ==
+wompi -> rutas_pagos : POST /pagos/webhooks/wompi (evento firmado)
+rutas_pagos -> rutas_pagos : webhook_wompi():\nleer_cuerpo_limitado() (64 KiB)
+rutas_pagos -> procesamiento : procesar_evento_wompi(sesion, cuerpo, secreto)
+procesamiento -> bd : INSERT eventos_pago (cuerpo crudo)
+procesamiento -> procesamiento : verificar_firma_evento()\ny clave_idempotencia (descarta repetidos)
+procesamiento -> servicio : aplicar_resultado() → aplicar_resultado_pago()
+rutas_pagos --> wompi : 200 EventoRecibido
+
+loop consulta de respaldo, mientras el pago siga pendiente
+  front -> rutas_pagos : GET /pagos/{referencia}
+  rutas_pagos -> procesamiento : obtener_pago() y sincronizar()
+  procesamiento -> pasarela : consultar(referencia)
+  pasarela --> procesamiento : ResultadoCobro
+  procesamiento -> servicio : aplicar_resultado() → aplicar_resultado_pago()
+  rutas_pagos --> front : 200 PagoDetalle
+end
+@enduml

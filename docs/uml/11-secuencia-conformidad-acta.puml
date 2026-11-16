@@ -1,0 +1,59 @@
+@startuml
+!include estilo.iuml
+title Secuencia — Dar conformidad a un acta (HU-11)
+
+autonumber
+actor "Operador o\nadministrador" as operador
+actor "Cliente" as cliente
+participant "alquileres/rutas.py" as rutas_alquileres
+participant "alquileres/servicio.py" as alquileres
+participant "reportes/registro.py" as registro
+participant "reportes/rutas.py" as rutas
+participant "reportes/servicio.py" as servicio
+participant "reportes/documentos.py" as documentos
+database "PostgreSQL" as bd
+
+== El acta nace sola, al entregar el vehículo ==
+operador -> rutas_alquileres : POST /alquileres/{alquiler_id}/entrega\n{estado_vehiculo, nivel_bateria} (opcional)
+rutas_alquileres -> alquileres : entregar_vehiculo()
+alquileres -> alquileres : poner_en_curso(): alquiler → en_curso,\nunidad → alquilado
+alquileres -> registro : registrar_acta(sesion, TipoActa.ENTREGA,\nvehiculo, usuario, acta, alquiler_id=...)
+registro -> documentos : instantanea(acta)
+registro -> bd : INSERT actas (con la instantánea en JSONB)
+alquileres -> bd : commit (el acta y la entrega, en la misma transacción)
+rutas_alquileres --> operador : 200 AlquilerRespuesta
+
+== El cliente revisa el acta ==
+cliente -> rutas : GET /actas/mias
+rutas -> servicio : listar_actas()
+rutas --> cliente : 200 Pagina[ActaRespuesta]
+cliente -> rutas : GET /actas/{acta_id}/pdf
+rutas -> servicio : descargar_pdf() → pdf()
+servicio -> documentos : pdf_acta(): siempre los mismos bytes\npara la misma acta (sale de la instantánea)
+rutas --> cliente : 200 application/pdf
+
+== Conformidad (una sola vez) ==
+cliente -> rutas : POST /actas/{acta_id}/conformidad + JWT
+rutas -> servicio : dar_conformidad(sesion, acta_id, usuario)
+servicio -> servicio : obtener_acta(): solo el cliente\nde la operación la ve
+servicio -> bd : SELECT ... FOR UPDATE del acta
+alt ya tenía conformidad
+  servicio --> rutas : ConformidadYaRegistrada
+  rutas --> cliente : 409
+else primera vez
+  servicio -> documentos : huella(pdf_acta(acta)) → SHA-256
+  servicio -> bd : UPDATE actas: conforme_por_id,\nconforme_en, hash_pdf
+  servicio -> bd : registrar_auditoria(accion="conformidad"); commit
+  rutas --> cliente : 200 ActaRespuesta
+end
+
+== Verificación posterior ==
+cliente -> rutas : GET /actas/{acta_id}/verificacion
+rutas -> servicio : verificar(): regenera el PDF y compara\nsu SHA-256 con hash_pdf
+rutas --> cliente : 200 VerificacionActa (con_conformidad, coincide, hash_pdf)
+
+note over cliente, bd
+  No es una firma digital con certificado: es un registro de quién aceptó,
+  cuándo, y la huella SHA-256 del PDF aceptado.
+end note
+@enduml

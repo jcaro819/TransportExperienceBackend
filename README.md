@@ -117,6 +117,7 @@ ruff format .          # formatear el código
 alembic revision --autogenerate -m "descripcion"   # nueva migración
 alembic upgrade head   # aplicar migraciones pendientes
 python -m scripts.generar_diagrama_er   # regenerar docs/uml/modelo-datos.md
+python -m scripts.generar_uml           # regenerar los diagramas UML de docs/uml (ver docs/uml/README.md)
 python -m scripts.respaldo_bd respaldar   # respaldo de la base (ver arriba)
 docker compose down    # apagar la base (conserva los datos)
 ```

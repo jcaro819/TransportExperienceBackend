@@ -1,0 +1,66 @@
+@startuml
+!include estilo.iuml
+title Secuencia — Comprar vehículos y accesorios (HU-04 y HU-05)
+
+autonumber
+actor "Cliente" as cliente
+participant "frontend\n(app.js)" as front
+participant "ventas/rutas.py" as rutas
+participant "ventas/servicio.py" as servicio
+participant "ventas/liberacion.py" as liberacion
+participant "inventario/servicio.py" as inventario
+participant "pagos/procesamiento.py" as procesamiento
+participant "PasarelaPagos" as pasarela
+database "PostgreSQL" as bd
+participant "pagos/rutas.py" as rutas_pagos
+
+== Crear la compra (aparta lo comprado 15 minutos) ==
+cliente -> front : arma el carrito
+front -> rutas : POST /ventas\n{vehiculos: [modelo_id, cantidad],\nproductos: [producto_id, cantidad]} + JWT
+rutas -> servicio : crear_venta(sesion, cliente, datos)
+servicio -> inventario : obtener_modelo_visible() por cada modelo
+servicio -> liberacion : bloquear_y_expirar(sesion, momento,\nunidad_ids, producto_ids)
+liberacion -> inventario : bloquear_inventario():\nvehículos por id, luego productos por id
+inventario -> bd : SELECT ... FOR UPDATE
+liberacion -> bd : las compras vencidas pasan a "expirada"\ny devuelven su stock (liberar_venta())
+servicio -> servicio : valida unidades libres y stock\n(SinUnidadesParaVenta, StockInsuficiente)
+servicio -> bd : INSERT ventas (estado = pendiente_pago,\nexpira_en = ahora + 15 min) e items_venta
+servicio -> inventario : cambiar_estado_vehiculo():\ndisponible → reservado
+servicio -> bd : productos.stock -= cantidad;\nregistrar_auditoria() y commit
+rutas --> front : 201 VentaRespuesta
+
+== Comprobante preliminar ==
+front -> rutas : GET /ventas/{venta_id}/comprobante
+rutas -> servicio : obtener_comprobante()
+rutas --> front : 200 ComprobantePreliminar (JSON)
+
+== Pago ==
+front -> rutas : POST /ventas/{venta_id}/pago\n{metodo_pago, tarjeta.token | pse}
+rutas -> procesamiento : pagar(sesion, cliente, datos,\npasarela, venta_id=...)
+procesamiento -> servicio : preparar_pago():\npago "pendiente" y commit
+procesamiento -> pasarela : cobrar(SolicitudCobro)
+pasarela --> procesamiento : ResultadoCobro
+procesamiento -> servicio : aplicar_resultado() →\naplicar_resultado_pago()
+
+alt aprobado y todas las unidades siguen "reservado"
+  servicio -> inventario : cambiar_estado_vehiculo():\nreservado → vendido
+  servicio -> bd : venta: pendiente_pago → pagada; commit
+else aprobado, pero una unidad ya no está apartada
+  servicio -> bd : venta cancelada, se devuelve lo apartado y\nregistrar_devolucion() (pago de compensación)
+else rechazado, expirado o error
+  servicio -> bd : vuelve el plazo original;\nsi ya pasó: liberar_venta() → expirada
+end
+rutas --> front : 201 PagoVentaRespuesta (venta y pago)
+
+== Comprobante de pago en PDF ==
+front -> rutas_pagos : GET /pagos/{referencia}/comprobante
+rutas_pagos -> procesamiento : obtener_pago()
+rutas_pagos -> rutas_pagos : generar_pdf(datos_comprobante())\n(pagos/comprobante.py, ReportLab)
+rutas_pagos --> front : 200 application/pdf
+
+note over front, rutas_pagos
+  Si el pago queda pendiente, se resuelve igual que en el alquiler:
+  webhook POST /pagos/webhooks/wompi o consulta GET /pagos/{referencia}
+  (ver 07-secuencia-alquiler-pago).
+end note
+@enduml

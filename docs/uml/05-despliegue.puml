@@ -1,0 +1,58 @@
+@startuml
+!include estilo.iuml
+title Diagrama de despliegue — TransportExperience (entorno de desarrollo y sustentación)
+
+node "Equipo del usuario" as equipo_usuario {
+  node "Navegador web" as navegador {
+    artifact "frontend descargado\n<size:10>index.html · app.js · styles.css</size>" as pagina
+  }
+}
+
+node "Equipo del proyecto (127.0.0.1)" as servidor {
+  node "Servidor de archivos estáticos\n<size:10>python -m http.server 5173</size>" as estatico {
+    artifact "frontend/" as frontend
+  }
+
+  node "Uvicorn :8000\n<size:10>uvicorn app.main:app</size>" as uvicorn {
+    artifact "Backend FastAPI\n<size:10>app/main.py + app/modulos/</size>" as api
+  }
+
+  node "Simulador GPS\n<size:10>python -m simulador_gps</size>" as simulador {
+    artifact "simulador_gps/" as codigo_simulador
+  }
+
+  node "Docker Compose (proyecto transportexperience)" as compose {
+    node "transportexperience-postgres\n<size:10>imagen postgres:16-alpine · puerto 5432</size>" as contenedor_pg {
+      database "transportexperience" as bd
+      database "transportexperience_pruebas\n<size:10>la usan los tests</size>" as bd_pruebas
+    }
+    node "transportexperience-adminer\n<size:10>imagen adminer · puerto 8080</size>" as adminer
+    storage "volumen datos_postgres" as volumen
+  }
+}
+
+cloud "Wompi sandbox\n<size:10>https://sandbox.wompi.co/v1</size>" as wompi
+node "Dispositivo GPS real\n<size:10>opcional: GPS_FUENTE=dispositivo</size>" as dispositivo
+
+navegador --> estatico : HTTP :5173\n(descarga el frontend)
+navegador --> uvicorn : HTTP/JSON :8000\n(CORS, JWT)
+uvicorn --> contenedor_pg : TCP 5432\n(SQLAlchemy + psycopg)
+adminer --> contenedor_pg : TCP 5432
+contenedor_pg --> volumen
+navegador ..> adminer : HTTP :8080\n(solo el equipo)
+simulador --> uvicorn : HTTP POST /rastreo/posiciones\ncada 5 s
+dispositivo ..> uvicorn : HTTP POST /rastreo/posiciones
+uvicorn --> wompi : HTTPS\n(cobro y consulta de respaldo)
+wompi ..> uvicorn : HTTPS POST /pagos/webhooks/wompi
+
+note bottom of wompi
+  En desarrollo Wompi no alcanza a 127.0.0.1:
+  el estado del pago se confirma con la consulta
+  de respaldo (GET /pagos/{referencia}).
+end note
+
+note bottom of compose
+  Los puertos solo se publican en 127.0.0.1.
+  Arranque: docker compose up -d
+end note
+@enduml

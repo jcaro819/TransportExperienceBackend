@@ -1,0 +1,415 @@
+@startuml
+' GENERADO por scripts/generar_uml.py desde el código. No editar a mano.
+!include estilo.iuml
+title Diagrama de clases por capas — rutas.py → servicio.py → modelos.py de cada módulo
+
+set separator none
+left to right direction
+
+class "app/main.py" as main <<control maestro>> {
+  app = FastAPI(...)
+  registrar_manejadores(app)
+  app.include_router(enrutador_autenticacion)
+  app.include_router(enrutador_usuarios)
+  app.include_router(enrutador_catalogo)
+  app.include_router(enrutador_vehiculos)
+  app.include_router(enrutador_inventario)
+  app.include_router(enrutador_portal)
+  app.include_router(enrutador_alquileres)
+  app.include_router(enrutador_ventas)
+  app.include_router(enrutador_pagos)
+  app.include_router(enrutador_domicilios)
+  app.include_router(enrutador_rastreo)
+  app.include_router(enrutador_actas)
+  --
+  GET /salud → salud()
+}
+
+package "app/modulos/alquileres\n<size:10>además: consultas.py, esquemas.py, estados.py, excepciones.py</size>" {
+  class "rutas.py" as alquileres_rutas <<rutas>> {
+    POST /alquileres → crear()
+    GET /alquileres/mios → listar_mios()
+    GET /alquileres/en-riesgo → listar_en_riesgo()
+    GET /alquileres → listar()
+    GET /alquileres/{alquiler_id} → ver()
+    POST /alquileres/{alquiler_id}/pago → pagar()
+    POST /alquileres/{alquiler_id}/cancelacion → cancelar()
+    POST /alquileres/{alquiler_id}/cancelacion-con-devolucion → cancelar_con_devolucion()
+    POST /alquileres/{alquiler_id}/entrega → entregar()
+    POST /alquileres/{alquiler_id}/devolucion → recibir()
+    POST /alquileres/{alquiler_id}/reasignacion → reasignar()
+  }
+  class "servicio.py" as alquileres_servicio <<servicio>> {
+    calcular_subtotal()
+    validar_fechas()
+    esta_vencido()
+    estado_vigente()
+    expirar_vencidos()
+    crear_alquiler()
+    bloquear_del_cliente()
+    preparar_pago()
+    aplicar_resultado_pago()
+    cancelar_alquiler()
+    cancelar_con_devolucion()
+    listar_alquileres()
+    obtener_alquiler()
+    entregar_vehiculo()
+    poner_en_curso()
+    recibir_vehiculo()
+    listar_en_riesgo()
+    reasignar_alquiler()
+  }
+  class "modelos.py" as alquileres_modelos <<modelos>> {
+    enum EstadoAlquiler
+    Alquiler  <<alquileres>>
+  }
+}
+
+package "app/modulos/domicilios\n<size:10>además: consultas.py, esquemas.py, estados.py, excepciones.py, geometria.py, liberacion.py</size>" {
+  class "rutas.py" as domicilios_rutas <<rutas>> {
+    GET /domicilios/zonas → listar_zonas()
+    GET /domicilios/cobertura → cobertura()
+    GET /domicilios/rastreo/{codigo} → rastreo()
+    POST /domicilios → solicitar()
+    GET /domicilios/mios → listar_mios()
+    GET /domicilios/asignados → listar_asignados()
+    GET /domicilios/domiciliarios-disponibles → domiciliarios_disponibles()
+    GET /domicilios → listar()
+    GET /domicilios/{domicilio_id} → ver()
+    POST /domicilios/{domicilio_id}/cancelacion → cancelar()
+    POST /domicilios/{domicilio_id}/asignacion → asignar()
+    POST /domicilios/{domicilio_id}/estado → avanzar_estado()
+    POST /domicilios/{domicilio_id}/cancelacion-por-despacho → cancelar_por_despacho()
+  }
+  class "servicio.py" as domicilios_servicio <<servicio>> {
+    listar_zonas()
+    zona_para_punto()
+    solicitar_domicilio()
+    cancelar_domicilio()
+    listar_domicilios()
+    obtener_domicilio()
+    listar_domiciliarios_disponibles()
+    asignar_domiciliario()
+    avanzar_estado()
+    cancelar_por_despacho()
+    rastreo_publico()
+  }
+  class "modelos.py" as domicilios_modelos <<modelos>> {
+    enum EstadoDomicilio
+    ZonaCobertura  <<zonas_cobertura>>
+    Domicilio  <<domicilios>>
+    HistorialEstadoDomicilio  <<historial_estados_domicilio>>
+  }
+}
+
+package "app/modulos/inventario\n<size:10>además: esquemas.py, esquemas_gestion.py, estados.py, excepciones.py</size>" {
+  class "rutas.py" as inventario_rutas <<rutas>> {
+    GET /catalogo/tipos → listar_tipos()
+    GET /catalogo/modelos → listar_modelos()
+    GET /catalogo/modelos/{modelo_id} → ver_modelo()
+    GET /catalogo/modelos/{modelo_id}/disponibilidad → consultar_disponibilidad()
+    GET /catalogo/productos → listar_productos()
+    GET /vehiculos → listar_vehiculos()
+    GET /vehiculos/{vehiculo_id}/novedades → listar_novedades()
+    POST /vehiculos/{vehiculo_id}/inactivacion → inactivar()
+    POST /vehiculos/{vehiculo_id}/novedades → reportar_novedad()
+    POST /vehiculos/{vehiculo_id}/novedades/{novedad_id}/cierre → cerrar_novedad()
+  }
+  class "rutas_gestion.py" as inventario_rutas_gestion <<rutas>> {
+    GET /inventario/resumen → resumen()
+    GET /inventario/alertas-stock → alertas_stock()
+    GET /inventario/tipos → listar_tipos()
+    POST /inventario/tipos → crear_tipo()
+    PATCH /inventario/tipos/{tipo_id} → actualizar_tipo()
+    GET /inventario/modelos → listar_modelos()
+    POST /inventario/modelos → crear_modelo()
+    PATCH /inventario/modelos/{modelo_id} → actualizar_modelo()
+    POST /inventario/unidades → crear_unidad()
+    PATCH /inventario/unidades/{vehiculo_id} → actualizar_unidad()
+    GET /inventario/productos → listar_productos()
+    POST /inventario/productos → crear_producto()
+    PATCH /inventario/productos/{producto_id} → actualizar_producto()
+    POST /inventario/productos/{producto_id}/ajustes → ajustar_stock()
+  }
+  class "gestion.py" as inventario_gestion <<servicio>> {
+    listar_tipos()
+    crear_tipo()
+    actualizar_tipo()
+    listar_modelos()
+    crear_modelo()
+    actualizar_modelo()
+    crear_unidad()
+    actualizar_unidad()
+    listar_productos()
+    alertas_de_stock()
+    crear_producto()
+    actualizar_producto()
+    ajustar_stock()
+    resumen()
+  }
+  class "servicio.py" as inventario_servicio <<servicio>> {
+    consulta_unidades_libres()
+    listar_tipos()
+    listar_modelos()
+    obtener_modelo_visible()
+    obtener_modelo()
+    consultar_disponibilidad()
+    listar_productos()
+    bloquear_vehiculo()
+    bloquear_inventario()
+    cambiar_estado_vehiculo()
+    listar_vehiculos()
+    listar_novedades()
+    reportar_novedad()
+    inactivar_vehiculo()
+    cerrar_novedad()
+  }
+  class "modelos.py" as inventario_modelos <<modelos>> {
+    enum EstadoVehiculo
+    enum CategoriaProducto
+    enum TipoNovedad
+    enum EstadoNovedad
+    TipoVehiculo  <<tipos_vehiculo>>
+    ModeloVehiculo  <<modelos_vehiculo>>
+    Vehiculo  <<vehiculos>>
+    Producto  <<productos>>
+    NovedadVehiculo  <<novedades_vehiculo>>
+  }
+}
+
+package "app/modulos/pagos\n<size:10>además: esquemas.py, excepciones.py, wompi.py</size>" {
+  class "rutas.py" as pagos_rutas <<rutas>> {
+    GET /pagos/configuracion → configuracion()
+    GET /pagos/pse/bancos → bancos_pse()
+    GET /pagos/devoluciones-pendientes → devoluciones_pendientes()
+    POST /pagos/webhooks/wompi → webhook_wompi()
+    GET /pagos/{referencia} → ver()
+    GET /pagos/{referencia}/comprobante → comprobante()
+    POST /pagos/{referencia}/devolucion-ejecutada → devolucion_ejecutada()
+  }
+  class "comprobante.py" as pagos_comprobante <<servicio>> {
+    pesos()
+    datos_comprobante()
+    generar_pdf()
+  }
+  class "pasarela.py" as pagos_pasarela <<servicio>> {
+    class PasarelaPagos
+    class PasarelaFalsa
+    obtener_pasarela()
+  }
+  class "procesamiento.py" as pagos_procesamiento <<servicio>> {
+    pagar()
+    aplicar_resultado()
+    sincronizar()
+    procesar_evento_wompi()
+    obtener_pago()
+    cliente_del_pago()
+    listar_devoluciones_pendientes()
+    marcar_devolucion_ejecutada()
+    cobros_pendientes()
+  }
+  class "servicio.py" as pagos_servicio <<servicio>> {
+    obtener_metodo_activo()
+    hay_cobro_pendiente()
+    crear_cobro_pendiente()
+    bloquear_pago()
+    registrar_resultado()
+    ya_devuelto()
+    registrar_devolucion()
+    cobro_aprobado()
+  }
+  class "modelos.py" as pagos_modelos <<modelos>> {
+    enum EstadoPago
+    enum TipoPago
+    MetodoPago  <<metodos_pago>>
+    Pago  <<pagos>>
+    EventoPago  <<eventos_pago>>
+  }
+}
+
+package "app/modulos/portal\n<size:10>además: esquemas.py</size>" {
+  class "rutas.py" as portal_rutas <<rutas>> {
+    GET /portal → ver_portal()
+    PUT /portal/secciones/{seccion} → editar_seccion()
+    PUT /portal/horarios/{dia} → editar_horario()
+    DELETE /portal/horarios/{dia} → cerrar_dia()
+  }
+  class "servicio.py" as portal_servicio <<servicio>> {
+    obtener_portal()
+    guardar_seccion()
+    guardar_horario()
+    cerrar_dia()
+  }
+  class "modelos.py" as portal_modelos <<modelos>> {
+    enum SeccionPortal
+    enum DiaSemana
+    ContenidoPortal  <<contenido_portal>>
+    HorarioAtencion  <<horarios_atencion>>
+  }
+}
+
+package "app/modulos/rastreo\n<size:10>además: esquemas.py, excepciones.py</size>" {
+  class "rutas.py" as rastreo_rutas <<rutas>> {
+    POST /rastreo/posiciones → reportar_posicion()
+    GET /rastreo/flota → flota()
+    GET /rastreo/vehiculos/{vehiculo_id}/recorrido → recorrido()
+    POST /rastreo/vehiculos/{vehiculo_id}/clave → emitir_clave()
+  }
+  class "servicio.py" as rastreo_servicio <<servicio>> {
+    hash_clave()
+    emitir_clave()
+    vehiculo_por_clave()
+    registrar_posicion()
+    listar_flota()
+    recorrido()
+    limpiar_historial()
+  }
+  class "modelos.py" as rastreo_modelos <<modelos>> {
+    enum FuenteGps
+    PosicionGps  <<posiciones_gps>>
+  }
+}
+
+package "app/modulos/reportes\n<size:10>además: esquemas.py, excepciones.py, registro.py</size>" {
+  class "rutas.py" as reportes_rutas <<rutas>> {
+    GET /actas → listar()
+    GET /actas/mias → listar_mias()
+    GET /actas/exportacion/excel → exportar_excel()
+    GET /actas/exportacion/pdf → exportar_pdf()
+    GET /actas/{acta_id} → ver()
+    GET /actas/{acta_id}/pdf → descargar_pdf()
+    POST /actas/{acta_id}/conformidad → dar_conformidad()
+    GET /actas/{acta_id}/verificacion → verificar()
+  }
+  class "documentos.py" as reportes_documentos <<servicio>> {
+    operacion()
+    cliente()
+    instantanea()
+    pdf_acta()
+    pdf_desde_instantanea()
+    huella()
+    excel_reporte()
+    pdf_reporte()
+  }
+  class "servicio.py" as reportes_servicio <<servicio>> {
+    listar_actas()
+    obtener_acta()
+    pdf()
+    dar_conformidad()
+    verificar()
+    reporte()
+  }
+  class "modelos.py" as reportes_modelos <<modelos>> {
+    enum TipoActa
+    Acta  <<actas>>
+  }
+}
+
+package "app/modulos/usuarios\n<size:10>además: esquemas.py, excepciones.py</size>" {
+  class "rutas.py" as usuarios_rutas <<rutas>> {
+    POST /autenticacion/token → iniciar_sesion()
+    POST /usuarios/registro → registrarse()
+    GET /usuarios/yo → mi_perfil()
+    GET /usuarios → listar_usuarios()
+    POST /usuarios → crear_usuario()
+    GET /usuarios/{usuario_id} → ver_usuario()
+    PATCH /usuarios/{usuario_id} → actualizar_usuario()
+  }
+  class "servicio.py" as usuarios_servicio <<servicio>> {
+    registrar_cliente()
+    crear_usuario()
+    autenticar()
+    iniciar_sesion()
+    obtener_usuario()
+    listar_usuarios()
+    actualizar_usuario()
+  }
+  class "modelos.py" as usuarios_modelos <<modelos>> {
+    enum Rol
+    Usuario  <<usuarios>>
+  }
+}
+
+package "app/modulos/ventas\n<size:10>además: consultas.py, esquemas.py, estados.py, excepciones.py, liberacion.py</size>" {
+  class "rutas.py" as ventas_rutas <<rutas>> {
+    POST /ventas → crear()
+    GET /ventas/mias → listar_mias()
+    GET /ventas/devoluciones-pendientes → listar_devoluciones_pendientes()
+    GET /ventas → listar()
+    GET /ventas/{venta_id} → ver()
+    POST /ventas/{venta_id}/pago → pagar()
+    POST /ventas/{venta_id}/cancelacion → cancelar()
+    GET /ventas/{venta_id}/comprobante → comprobante()
+  }
+  class "servicio.py" as ventas_servicio <<servicio>> {
+    esta_vencida()
+    estado_vigente()
+    crear_venta()
+    bloquear_del_cliente()
+    preparar_pago()
+    aplicar_resultado_pago()
+    cancelar_venta()
+    listar_ventas()
+    listar_devoluciones_pendientes()
+    obtener_venta()
+    obtener_comprobante()
+  }
+  class "modelos.py" as ventas_modelos <<modelos>> {
+    enum EstadoVenta
+    Venta  <<ventas>>
+    ItemVenta  <<items_venta>>
+  }
+}
+
+alquileres_rutas ..> alquileres_modelos
+alquileres_rutas --> alquileres_servicio
+alquileres_servicio --> alquileres_modelos
+main --> alquileres_rutas : enrutador_alquileres
+domicilios_rutas ..> domicilios_modelos
+domicilios_rutas --> domicilios_servicio
+domicilios_servicio --> domicilios_modelos
+main --> domicilios_rutas : enrutador_domicilios
+inventario_gestion --> inventario_modelos
+inventario_gestion --> inventario_servicio
+inventario_rutas ..> inventario_modelos
+inventario_rutas --> inventario_servicio
+inventario_rutas_gestion --> inventario_gestion
+inventario_rutas_gestion ..> inventario_modelos
+inventario_servicio --> inventario_modelos
+main --> inventario_rutas : enrutador_catalogo, enrutador_vehiculos
+main --> inventario_rutas_gestion : enrutador_inventario
+pagos_comprobante --> pagos_modelos
+pagos_pasarela --> pagos_modelos
+pagos_procesamiento --> pagos_modelos
+pagos_procesamiento --> pagos_pasarela
+pagos_procesamiento --> pagos_servicio
+pagos_rutas --> pagos_comprobante
+pagos_rutas ..> pagos_modelos
+pagos_rutas --> pagos_pasarela
+pagos_rutas --> pagos_procesamiento
+pagos_servicio --> pagos_modelos
+pagos_servicio --> pagos_pasarela
+main --> pagos_rutas : enrutador_pagos
+portal_rutas ..> portal_modelos
+portal_rutas --> portal_servicio
+portal_servicio --> portal_modelos
+main --> portal_rutas : enrutador_portal
+rastreo_rutas --> rastreo_servicio
+rastreo_servicio --> rastreo_modelos
+main --> rastreo_rutas : enrutador_rastreo
+reportes_documentos --> reportes_modelos
+reportes_rutas --> reportes_documentos
+reportes_rutas ..> reportes_modelos
+reportes_rutas --> reportes_servicio
+reportes_servicio --> reportes_documentos
+reportes_servicio --> reportes_modelos
+main --> reportes_rutas : enrutador_actas
+usuarios_rutas ..> usuarios_modelos
+usuarios_rutas --> usuarios_servicio
+usuarios_servicio --> usuarios_modelos
+main --> usuarios_rutas : enrutador_autenticacion, enrutador_usuarios
+ventas_rutas ..> ventas_modelos
+ventas_rutas --> ventas_servicio
+ventas_servicio --> ventas_modelos
+main --> ventas_rutas : enrutador_ventas
+@enduml
