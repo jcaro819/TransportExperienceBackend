@@ -1,0 +1,47 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-18 Actualizar el estado de la entrega (HU-07, HU-11)
+
+autonumber
+actor "Domiciliario\n(u operador, para corregir)" as domiciliario
+participant "frontend/" as front
+participant "domicilios/rutas.py" as rutas
+participant "domicilios/servicio.py" as servicio
+participant "alquileres/servicio.py" as alquileres
+participant "reportes/registro.py" as registro
+database "PostgreSQL" as bd
+
+domiciliario -> front : abre sus entregas
+front -> rutas : GET /domicilios/asignados + JWT
+rutas -> servicio : listar_asignados() → listar_domicilios()
+rutas --> front : 200 Pagina[DomicilioRespuesta]\n(con su vehiculo_transporte)
+
+loop recogido, en_camino y entregado (sin saltar pasos)
+  domiciliario -> front : marca el siguiente estado
+  front -> rutas : POST /domicilios/{domicilio_id}/estado + JWT\n(el estado nuevo)
+  rutas -> servicio : avanzar_estado()
+  alt el domiciliario no es el asignado
+    servicio --> rutas : DomicilioNoEncontrado (404: no se revela la entrega)
+  else salta un paso
+    servicio --> rutas : TransicionDeDomicilioInvalida
+  else paso válido
+    servicio -> bd : _bloquear_entrega(): unidades,\noperación y domicilio (FOR UPDATE)
+    servicio -> servicio : validar_transicion() y\ncambiar_estado_domicilio()
+    servicio -> bd : INSERT historial_estados_domicilio
+    opt el estado nuevo es "entregado"
+      opt es la entrega de un alquiler
+        servicio -> alquileres : poner_en_curso(): alquiler → en_curso,\nunidad → alquilado
+      end
+      servicio -> registro : registrar_acta(TipoActa.ENTREGA, ...)\n(una por unidad entregada)
+      servicio -> servicio : _liberar_transporte():\nvehículo de transporte → disponible
+    end
+    servicio -> bd : commit
+    rutas --> front : 200 DomicilioRespuesta
+  end
+end
+
+note over domiciliario, bd
+  Si el alquiler no se puede entregar (fuera de fechas, unidad en mantenimiento),
+  nada cambia: todo ocurre en una sola transacción.
+end note
+@enduml

@@ -1,0 +1,49 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-14 Confirmar el pago por webhook (HU-05)
+
+autonumber
+participant "Wompi (sandbox)" as wompi
+participant "pagos/rutas.py" as rutas
+participant "comun/peticiones.py" as peticiones
+participant "pagos/procesamiento.py" as procesamiento
+participant "pagos/wompi.py" as modulo_wompi
+participant "alquileres/servicio.py\no ventas/servicio.py" as operacion
+participant "pagos/servicio.py" as pagos
+database "PostgreSQL" as bd
+
+wompi -> rutas : POST /pagos/webhooks/wompi\n(evento transaction.updated, con su firma)
+rutas -> peticiones : webhook_wompi() → leer_cuerpo_limitado(\nrequest, LIMITE_CUERPO_WEBHOOK)
+alt el cuerpo pasa de 64 KiB
+  rutas --> wompi : 413 cuerpo_demasiado_grande\n(no se guarda el evento)
+else tamaño normal
+  rutas -> procesamiento : procesar_evento_wompi(sesion, cuerpo, secreto)
+  procesamiento -> modulo_wompi : verificar_firma_evento(evento, secreto)
+  procesamiento -> bd : _guardar_evento(): INSERT eventos_pago\n(siempre el cuerpo crudo)
+  alt firma inválida, ambiente distinto de test,\nreferencia desconocida o monto distinto
+    procesamiento -> procesamiento : no se procesa (el evento queda guardado)
+  else evento válido
+    procesamiento -> modulo_wompi : resultado_de_transaccion() → ResultadoCobro
+    procesamiento -> procesamiento : aplicar_resultado()
+    procesamiento -> operacion : aplicar_resultado_pago()
+    operacion -> pagos : bloquear_pago() y registrar_resultado()
+    alt el pago ya estaba resuelto (evento repetido)
+      pagos --> operacion : sin cambios (idempotente)
+    else aprobado
+      operacion -> bd : pago → aprobado;\nalquiler → confirmado o venta → pagada
+    else rechazado, expirado o error
+      operacion -> bd : pago → su estado; la operación\nrecupera su plazo original
+    else aprobado tarde (la operación ya no se puede completar)
+      operacion -> pagos : registrar_devolucion()
+    end
+    operacion -> bd : commit
+  end
+  rutas --> wompi : 200 EventoRecibido\n(siempre: si no, Wompi reintenta)
+end
+
+note over wompi, bd
+  Lo llama Wompi, no el frontend. En desarrollo Wompi no alcanza a 127.0.0.1:
+  por eso existe además la consulta de respaldo (CU-13, sincronizar()) y el
+  script python -m scripts.sincronizar_pagos.
+end note
+@enduml

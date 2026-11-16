@@ -1,0 +1,40 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-19 Seguir el domicilio con el código de rastreo (HU-07)
+
+autonumber
+actor "Cliente o cualquier\npersona con el código" as cliente
+participant "frontend/" as front
+participant "domicilios/rutas.py" as rutas
+participant "domicilios/servicio.py" as servicio
+database "PostgreSQL" as bd
+
+== Consulta pública por código (sin iniciar sesión) ==
+cliente -> front : escribe el código de rastreo
+front -> rutas : GET /domicilios/rastreo/{codigo}
+rutas -> servicio : rastreo() → rastreo_publico(sesion, codigo)
+servicio -> bd : SELECT domicilios por codigo_rastreo
+alt el código no existe
+  servicio --> rutas : DomicilioNoEncontrado
+  rutas --> front : 404
+else existe
+  servicio -> bd : SELECT historial_estados_domicilio
+  servicio --> rutas : Rastreo
+  rutas --> front : 200 RastreoPublico\n(codigo_rastreo, estado, cambios[estado, en])
+  front --> cliente : pendiente, asignado, recogido,\nen camino o entregado, con sus horas
+end
+
+== El cliente, con su sesión ==
+cliente -> front : abre "mis domicilios"
+front -> rutas : GET /domicilios/mios + JWT
+rutas -> servicio : listar_mios() → listar_domicilios()
+rutas --> front : 200 Pagina[DomicilioRespuesta]
+front -> rutas : GET /domicilios/{domicilio_id} + JWT
+rutas -> servicio : ver() → obtener_domicilio()
+rutas --> front : 200 DomicilioRespuesta\n(aquí sí con la dirección: es su entrega)
+
+note over cliente, bd
+  La consulta pública no muestra dirección, teléfono, correo ni coordenadas (SRS 3.6.4).
+  El cliente ve el estado, no el mapa: el mapa de la flota es del administrador y el operador (CU-21).
+end note
+@enduml

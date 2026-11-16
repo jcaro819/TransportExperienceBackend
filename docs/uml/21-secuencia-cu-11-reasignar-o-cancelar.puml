@@ -1,0 +1,58 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-11 Reasignar o cancelar con devolución (HU-03, HU-05)
+
+autonumber
+actor "Administrador" as admin
+participant "frontend/" as front
+participant "alquileres/rutas.py" as rutas
+participant "alquileres/servicio.py" as servicio
+participant "pagos/servicio.py" as pagos
+participant "auditoria.py" as auditoria
+database "PostgreSQL" as bd
+
+== Alquileres en riesgo (unidad en mantenimiento) ==
+admin -> front : revisa los alquileres en riesgo
+front -> rutas : GET /alquileres/en-riesgo + JWT
+rutas -> servicio : listar_en_riesgo()
+servicio -> bd : SELECT alquileres aún no entregados\ncuya unidad está en mantenimiento
+rutas --> front : 200 Pagina[AlquilerRespuesta]
+
+== Opción 1: reasignar a otra unidad del mismo modelo ==
+admin -> front : reasigna el alquiler
+front -> rutas : POST /alquileres/{alquiler_id}/reasignacion + JWT
+rutas -> servicio : reasignar() → reasignar_alquiler()
+servicio -> bd : _bloquear_unidades_del_modelo():\nFOR UPDATE de todas, en orden de id
+servicio -> servicio : _libres_entre(): unidades libres\nen las mismas fechas
+alt no hay otra unidad libre
+  servicio --> rutas : SinUnidadesDisponibles
+  rutas --> front : el administrador decide: esperar o cancelar
+else hay unidad libre
+  servicio -> bd : UPDATE alquileres (vehiculo_id);\nmismas fechas y mismo precio
+  servicio -> auditoria : registrar_auditoria()
+  servicio -> bd : commit
+  rutas --> front : 200 AlquilerRespuesta
+end
+
+== Opción 2: cancelar un alquiler pagado, con devolución ==
+admin -> front : cancela con devolución (con el motivo)
+front -> rutas : POST /alquileres/{alquiler_id}/cancelacion-con-devolucion + JWT
+rutas -> servicio : cancelar_con_devolucion()
+servicio -> bd : _bloquear_alquiler()
+servicio -> servicio : validar_transicion(): confirmado → cancelado
+alt el domicilio del alquiler ya está asignado
+  servicio --> rutas : AlquilerNoCancelable:\nprimero se cancela la entrega
+else se puede cancelar
+  servicio -> servicio : _cambiar_estado() → cancelado\n(queda en auditoría)
+  servicio -> pagos : cobro_aprobado() y registrar_devolucion()
+  pagos -> bd : INSERT pagos (pago de compensación,\npendiente de ejecutar)
+  servicio -> bd : commit
+  rutas --> front : 200 CancelacionConDevolucionRespuesta
+end
+
+note over admin, bd
+  No hay reasignación automática. El reembolso lo hace el administrador
+  en el panel de Wompi y lo registra en CU-15. El pago aprobado nunca
+  se modifica: se compensa con otro registro.
+end note
+@enduml

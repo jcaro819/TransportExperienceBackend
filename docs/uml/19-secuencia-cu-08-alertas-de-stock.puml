@@ -1,0 +1,31 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-08 Consultar las alertas de bajo stock (HU-10)
+
+autonumber
+actor "Administrador\nu operador" as taller
+participant "frontend/" as front
+participant "inventario/rutas_gestion.py" as rutas
+participant "seguridad.py" as seguridad
+participant "inventario/gestion.py" as gestion
+database "PostgreSQL" as bd
+
+taller -> front : abre el tablero de inventario
+front -> rutas : GET /inventario/resumen + JWT
+rutas -> seguridad : AdministradorUOperador: requiere_roles()
+rutas -> gestion : resumen()
+gestion -> bd : SELECT estado, count(*) de vehiculos\ny count de productos en alerta
+rutas --> front : 200 ResumenInventario
+
+front -> rutas : GET /inventario/alertas-stock + JWT
+rutas -> gestion : alertas_stock() → alertas_de_stock()
+gestion -> gestion : _solo_taller()
+gestion -> bd : SELECT productos activos con stock <= stock_minimo,\nlos más urgentes primero
+rutas --> front : 200 Pagina[ProductoGestion]
+front --> taller : lista de productos por reponer
+
+note over taller, bd
+  La alerta es una consulta: no se envía correo ni SMS (HU-14 está fuera del MVP).
+  Producto.bajo_stock es una propiedad calculada, no una columna.
+end note
+@enduml

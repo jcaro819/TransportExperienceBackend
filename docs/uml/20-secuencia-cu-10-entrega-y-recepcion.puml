@@ -1,0 +1,51 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-10 Entregar y recibir el vehículo en el local (HU-03, HU-11)
+
+autonumber
+actor "Administrador\nu operador" as mostrador
+participant "frontend/" as front
+participant "alquileres/rutas.py" as rutas
+participant "alquileres/servicio.py" as servicio
+participant "inventario/servicio.py" as inventario
+participant "reportes/registro.py" as registro
+database "PostgreSQL" as bd
+
+mostrador -> front : busca el alquiler del cliente
+front -> rutas : GET /alquileres + JWT\n(filtros: estado, vehiculo_id, cliente_id)
+rutas -> servicio : listar() → listar_alquileres()
+rutas --> front : 200 Pagina[AlquilerRespuesta]
+
+== Entrega: confirmado → en_curso ==
+mostrador -> front : entrega la unidad
+front -> rutas : POST /alquileres/{alquiler_id}/entrega + JWT\n(opcional: estado_vehiculo, nivel_bateria)
+rutas -> servicio : entregar() → entregar_vehiculo()
+servicio -> bd : _bloquear_alquiler(): FOR UPDATE de la unidad\ny luego del alquiler
+alt el alquiler tiene un domicilio vigente
+  servicio --> rutas : VehiculoNoListoParaEntrega: se entrega\npor domicilio, no dos veces
+else fuera de las fechas o unidad en mantenimiento
+  servicio --> rutas : FueraDeLasFechasDelAlquiler\no VehiculoNoListoParaEntrega
+else se puede entregar
+  servicio -> servicio : poner_en_curso(): validar_transicion(),\nalquiler → en_curso
+  servicio -> inventario : cambiar_estado_vehiculo() → alquilado
+  servicio -> registro : registrar_acta(TipoActa.ENTREGA, ...)
+  registro -> bd : INSERT actas
+  servicio -> bd : commit (la entrega y el acta, juntas)
+  rutas --> front : 200 AlquilerRespuesta
+end
+
+== Recepción: en_curso → finalizado ==
+mostrador -> front : recibe la unidad de vuelta
+front -> rutas : POST /alquileres/{alquiler_id}/devolucion + JWT\n(opcional: estado_vehiculo, nivel_bateria)
+rutas -> servicio : recibir() → recibir_vehiculo()
+servicio -> bd : _bloquear_alquiler()
+servicio -> servicio : validar_transicion(); alquiler → finalizado
+alt la unidad entró en mantenimiento durante el alquiler
+  servicio -> servicio : la unidad se queda en mantenimiento
+else unidad sin novedades críticas
+  servicio -> inventario : cambiar_estado_vehiculo() → disponible
+end
+servicio -> registro : registrar_acta(TipoActa.RECEPCION, ...)
+servicio -> bd : commit
+rutas --> front : 200 AlquilerRespuesta
+@enduml

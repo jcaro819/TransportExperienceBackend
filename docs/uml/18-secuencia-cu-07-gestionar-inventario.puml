@@ -1,0 +1,57 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-07 Gestionar el inventario y ajustar el stock (HU-10)
+
+autonumber
+actor "Administrador" as admin
+participant "frontend/" as front
+participant "inventario/rutas_gestion.py" as rutas
+participant "inventario/gestion.py" as gestion
+participant "auditoria.py" as auditoria
+database "PostgreSQL" as bd
+
+== Consultar (administrador y operador) ==
+admin -> front : abre el panel de inventario
+front -> rutas : GET /inventario/tipos\nGET /inventario/modelos\nGET /inventario/productos
+rutas -> gestion : listar_tipos(), listar_modelos(), listar_productos()
+rutas --> front : 200 Pagina[...] (activos e inactivos)
+
+== Crear (solo administrador) ==
+admin -> front : crea un tipo, un modelo, una unidad o un producto
+front -> rutas : POST /inventario/tipos\nPOST /inventario/modelos\nPOST /inventario/unidades\nPOST /inventario/productos
+rutas -> gestion : crear_tipo(), crear_modelo(),\ncrear_unidad(), crear_producto()
+gestion -> gestion : _solo_administrador() y validaciones\n(_codigo_libre(), _validar_bateria()...)
+gestion -> bd : _guardar(): INSERT dentro de un SAVEPOINT
+gestion -> auditoria : _auditar() → registrar_auditoria()
+gestion -> bd : commit
+rutas --> front : 201 (la unidad nueva entra "disponible")
+
+== Editar (PATCH parcial) ==
+admin -> front : cambia una tarifa, un precio o un dato
+front -> rutas : PATCH /inventario/tipos/{tipo_id}\nPATCH /inventario/modelos/{modelo_id}\nPATCH /inventario/unidades/{vehiculo_id}\nPATCH /inventario/productos/{producto_id}
+rutas -> gestion : actualizar_tipo(), actualizar_modelo(),\nactualizar_unidad(), actualizar_producto()
+gestion -> gestion : _aplicar(): solo lo enviado; devuelve el\nantes y el después de lo que cambió
+opt hubo cambios
+  gestion -> auditoria : _auditar() (tarifas y precios incluidos)
+end
+rutas --> front : 200
+
+== Ajustar el stock (no se edita: se suma o se resta) ==
+admin -> front : registra una entrada o una salida
+front -> rutas : POST /inventario/productos/{producto_id}/ajustes + JWT\n(cantidad con signo y motivo)
+rutas -> gestion : ajustar_stock()
+gestion -> bd : _bloquear_producto(): SELECT ... FOR UPDATE
+alt el stock quedaría negativo
+  gestion --> rutas : AjusteDeStockInvalido
+else ajuste válido
+  gestion -> bd : UPDATE productos (stock)
+  gestion -> auditoria : _auditar() con el motivo
+  gestion -> bd : commit
+  rutas --> front : 200 ProductoGestion
+end
+
+note over admin, bd
+  "Inventario sincronizado" (HU-10): las compras (ventas/servicio.py) y los ajustes bloquean
+  la misma fila del producto, así que el stock no se descuadra aunque ocurran a la vez.
+end note
+@enduml

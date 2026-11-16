@@ -1,0 +1,57 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-22 Consultar y exportar actas en PDF y Excel (HU-11)
+
+autonumber
+actor "Administrador\nu operador" as usuario
+participant "frontend/" as front
+participant "reportes/rutas.py" as rutas
+participant "reportes/servicio.py" as servicio
+participant "reportes/documentos.py" as documentos
+database "PostgreSQL" as bd
+
+note over usuario, bd
+  Las actas no se crean aquí: nacen solas con reportes/registro.py registrar_acta(),
+  al entregar o recibir un vehículo (CU-10) y al entregar un domicilio (CU-18).
+end note
+
+== Listar ==
+usuario -> front : abre el panel de actas
+front -> rutas : GET /actas + JWT\n(filtros: tipo, vehiculo_id, desde, hasta)
+rutas -> servicio : listar() → listar_actas()
+servicio -> bd : SELECT actas, de la más reciente a la más antigua
+rutas --> front : 200 Pagina[ActaRespuesta]
+
+== Ver un acta y su PDF ==
+usuario -> front : abre un acta
+front -> rutas : GET /actas/{acta_id} + JWT
+rutas -> servicio : ver() → obtener_acta()
+rutas --> front : 200 ActaRespuesta
+front -> rutas : GET /actas/{acta_id}/pdf + JWT
+rutas -> servicio : descargar_pdf() → pdf()
+servicio -> documentos : pdf_acta() → pdf_desde_instantanea()\n(ReportLab; siempre los mismos bytes)
+rutas --> front : 200 application/pdf
+
+== Exportar un rango de días ==
+usuario -> front : exporta a Excel
+front -> rutas : GET /actas/exportacion/excel + JWT\n(desde, hasta, tipo)
+rutas -> servicio : exportar_excel() → reporte()
+alt rango al revés o de más de 92 días
+  servicio --> rutas : RangoDeReporteInvalido
+else rango válido (por defecto, los últimos 30 días)
+  servicio -> bd : SELECT actas del rango
+  servicio --> rutas : Reporte (actas y titulo)
+  rutas -> documentos : excel_reporte() (openpyxl, una fila por acta)
+  rutas --> front : 200 actas.xlsx
+end
+usuario -> front : exporta a PDF
+front -> rutas : GET /actas/exportacion/pdf + JWT
+rutas -> servicio : exportar_pdf() → reporte()
+rutas -> documentos : pdf_reporte() (tabla horizontal)
+rutas --> front : 200 application/pdf
+
+note over usuario, bd
+  La conformidad del cliente y la verificación de la huella SHA-256
+  están en CU-23 (11-secuencia-conformidad-acta).
+end note
+@enduml

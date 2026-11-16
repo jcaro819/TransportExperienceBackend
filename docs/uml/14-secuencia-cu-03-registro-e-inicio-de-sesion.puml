@@ -1,0 +1,51 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-03 Registrarse e iniciar sesión (HU-12)
+
+autonumber
+actor "Cliente, administrador,\noperador o domiciliario" as usuario
+participant "frontend/" as front
+participant "usuarios/rutas.py" as rutas
+participant "usuarios/servicio.py" as servicio
+participant "seguridad.py" as seguridad
+database "PostgreSQL" as bd
+
+== Registro (solo crea cuentas de cliente) ==
+usuario -> front : llena el formulario de registro
+front -> rutas : POST /usuarios/registro\n{nombre_completo, correo, contrasena, ...}
+rutas -> servicio : registrarse() → registrar_cliente()
+servicio -> servicio : _crear() y _normalizar_correo()
+alt el correo ya existe
+  servicio --> rutas : CorreoYaRegistrado
+  rutas --> front : error con la causa y la acción recomendada
+else correo libre
+  servicio -> seguridad : hashear_contrasena() (bcrypt)
+  servicio -> bd : INSERT usuarios (rol = cliente); commit
+  rutas --> front : 201 UsuarioRespuesta
+end
+
+== Inicio de sesión (los cuatro roles) ==
+usuario -> front : correo y contraseña
+front -> rutas : POST /autenticacion/token\n(formulario OAuth2: username, password)
+rutas -> servicio : iniciar_sesion() → autenticar()
+servicio -> bd : SELECT usuarios por correo
+servicio -> seguridad : verificar_contrasena()
+alt correo o contraseña incorrectos
+  servicio --> rutas : CredencialesInvalidas
+else cuenta inactiva
+  servicio --> rutas : CuentaInactiva
+else correcto
+  servicio -> seguridad : crear_token_acceso(usuario) → JWT
+  rutas --> front : 200 TokenAcceso
+end
+
+== Con la sesión iniciada ==
+front -> rutas : GET /usuarios/yo\nAuthorization: Bearer (JWT)
+rutas -> seguridad : UsuarioActual: obtener_usuario_actual()\n→ leer_token()
+rutas --> front : 200 UsuarioRespuesta (el rol decide qué panel se muestra)
+
+note over usuario, bd
+  Un correo inexistente tarda lo mismo que uno real (_hash_ficticio()),
+  para no revelar qué correos están registrados.
+end note
+@enduml

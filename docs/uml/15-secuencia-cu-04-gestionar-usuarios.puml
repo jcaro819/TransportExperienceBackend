@@ -1,0 +1,49 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-04 Gestionar usuarios y roles (HU-12)
+
+autonumber
+actor "Administrador" as admin
+participant "frontend/" as front
+participant "usuarios/rutas.py" as rutas
+participant "seguridad.py" as seguridad
+participant "usuarios/servicio.py" as servicio
+participant "auditoria.py" as auditoria
+database "PostgreSQL" as bd
+
+== Consultar ==
+admin -> front : abre el panel de usuarios
+front -> rutas : GET /usuarios + JWT\n(filtros: rol, activo, busqueda)
+rutas -> seguridad : SoloAdministrador:\nrequiere_roles(Rol.ADMINISTRADOR)
+rutas -> servicio : listar_usuarios()
+servicio -> bd : SELECT usuarios (paginado)
+rutas --> front : 200 Pagina[UsuarioRespuesta]
+front -> rutas : GET /usuarios/{usuario_id} + JWT
+rutas -> servicio : ver_usuario() → obtener_usuario()
+rutas --> front : 200 UsuarioRespuesta
+
+== Crear una cuenta con cualquier rol ==
+admin -> front : crea un operador o un domiciliario
+front -> rutas : POST /usuarios + JWT\n{correo, contrasena, rol, ...}
+rutas -> servicio : crear_usuario()
+servicio -> servicio : _crear() (CorreoYaRegistrado si el correo existe)
+servicio -> seguridad : hashear_contrasena()
+servicio -> bd : INSERT usuarios
+servicio -> auditoria : registrar_auditoria()
+servicio -> bd : commit
+rutas --> front : 201 UsuarioRespuesta
+
+== Cambiar el rol o desactivar ==
+admin -> front : cambia el rol o desactiva la cuenta
+front -> rutas : PATCH /usuarios/{usuario_id} + JWT\n(solo los campos que cambian)
+rutas -> servicio : actualizar_usuario()
+alt el administrador cambia su propio rol o se desactiva
+  servicio --> rutas : CambioSobreSiMismo
+  rutas --> front : error con la causa y la acción recomendada
+else cambio válido
+  servicio -> bd : UPDATE usuarios
+  servicio -> auditoria : registrar_auditoria()\n(cambios de rol y de estado)
+  servicio -> bd : commit
+  rutas --> front : 200 UsuarioRespuesta
+end
+@enduml

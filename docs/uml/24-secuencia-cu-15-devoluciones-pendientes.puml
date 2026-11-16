@@ -1,0 +1,46 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-15 Gestionar las devoluciones pendientes (HU-04, HU-05)
+
+autonumber
+actor "Administrador" as admin
+participant "frontend/" as front
+participant "pagos/rutas.py" as rutas
+participant "ventas/rutas.py" as rutas_ventas
+participant "pagos/procesamiento.py" as procesamiento
+participant "auditoria.py" as auditoria
+participant "Panel de Wompi\n(fuera del sistema)" as wompi
+database "PostgreSQL" as bd
+
+note over admin, bd
+  Una devolución nace sola, con pagos.servicio.registrar_devolucion(): al cancelar un alquiler pagado (CU-11),
+  al cancelar una entrega pagada (CU-17) o cuando un pago se aprueba y la operación ya no se puede completar.
+end note
+
+== Ver lo pendiente ==
+admin -> front : abre las devoluciones pendientes
+front -> rutas : GET /pagos/devoluciones-pendientes + JWT
+rutas -> procesamiento : devoluciones_pendientes()\n→ listar_devoluciones_pendientes()
+procesamiento -> bd : SELECT pagos de compensación sin ejecutar
+rutas --> front : 200 Pagina[PagoDetalle]
+front -> rutas_ventas : GET /ventas/devoluciones-pendientes + JWT
+rutas_ventas --> front : 200 Pagina[VentaRespuesta]\n(compras canceladas con devolución)
+
+== Ejecutar el reembolso ==
+admin -> wompi : hace el reembolso a mano
+wompi --> admin : reembolso hecho
+
+== Dejarlo registrado ==
+admin -> front : marca la devolución como ejecutada (con una nota)
+front -> rutas : POST /pagos/{referencia}/devolucion-ejecutada + JWT
+rutas -> procesamiento : devolucion_ejecutada()\n→ marcar_devolucion_ejecutada()
+procesamiento -> bd : pagos.bloquear_pago(): FOR UPDATE
+alt no es una devolución pendiente
+  procesamiento --> rutas : DevolucionNoPendiente
+else pendiente
+  procesamiento -> bd : UPDATE pagos (ejecutada, con la nota)
+  procesamiento -> auditoria : registrar_auditoria()
+  procesamiento -> bd : commit
+  rutas --> front : 200 PagoDetalle
+end
+@enduml

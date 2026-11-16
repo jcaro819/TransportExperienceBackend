@@ -1,0 +1,57 @@
+@startuml
+!include estilo.iuml
+title Secuencia — CU-17 Asignar el domiciliario (HU-06, HU-07)
+
+autonumber
+actor "Administrador\nu operador" as despacho
+participant "frontend/" as front
+participant "domicilios/rutas.py" as rutas
+participant "domicilios/servicio.py" as servicio
+participant "inventario/servicio.py" as inventario
+participant "pagos/servicio.py" as pagos
+database "PostgreSQL" as bd
+
+== Ver entregas y domiciliarios ==
+despacho -> front : abre el panel de despacho
+front -> rutas : GET /domicilios + JWT (filtro: estado)
+rutas -> servicio : listar() → listar_domicilios()
+rutas --> front : 200 Pagina[DomicilioRespuesta]
+front -> rutas : GET /domicilios/domiciliarios-disponibles + JWT
+rutas -> servicio : listar_domiciliarios_disponibles()
+servicio -> bd : SELECT domiciliarios activos\nsin entregas en ruta
+rutas --> front : 200 Pagina[PersonaContacto]
+
+== Asignar: pendiente → asignado ==
+despacho -> front : escoge el domiciliario\n(y, si quiere, su vehículo de transporte)
+front -> rutas : POST /domicilios/{domicilio_id}/asignacion + JWT
+rutas -> servicio : asignar() → asignar_domiciliario()
+servicio -> bd : FOR UPDATE en orden: vehículo de transporte\n(bloquear_vehiculo()), domiciliario, domicilio
+alt la operación no está pagada
+  servicio --> rutas : DomicilioSinPagar
+else el domiciliario ya tiene una entrega en ruta
+  servicio --> rutas : DomiciliarioNoDisponible
+else se puede asignar
+  opt con vehículo de transporte
+    servicio -> servicio : _validar_vehiculo_de_transporte()
+    servicio -> inventario : cambiar_estado_vehiculo()\n→ asignado_a_domicilio
+  end
+  servicio -> servicio : validar_transicion() y\ncambiar_estado_domicilio() → asignado
+  servicio -> bd : registrar_auditoria(); commit
+  rutas --> front : 200 DomicilioRespuesta
+end
+
+== Cancelar una entrega ya pagada (solo el despacho, con motivo) ==
+despacho -> front : cancela la entrega
+front -> rutas : POST /domicilios/{domicilio_id}/cancelacion-por-despacho + JWT
+rutas -> servicio : cancelar_por_despacho()
+servicio -> bd : _bloquear_entrega(): unidades, operación y domicilio
+servicio -> servicio : _liberar_transporte() y\ncambiar_estado_domicilio() → cancelado
+servicio -> pagos : cobro_aprobado() y registrar_devolucion()\n(solo el valor del envío)
+servicio -> bd : registrar_auditoria(); commit
+rutas --> front : 200 CancelacionDomicilioRespuesta
+
+note over despacho, bd
+  La asignación es manual: no hay asignación automática (decisión 2 del Sprint 3).
+  La reserva o la compra siguen vigentes aunque se cancele la entrega.
+end note
+@enduml
