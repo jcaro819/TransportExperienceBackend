@@ -25,12 +25,15 @@
     <nav class="nav" id="mainNav" aria-label="Navegación principal">
       <a href="#inicio" data-view-link="inicio" class="active">Inicio</a>
       <a href="#catalogo" data-view-link="catalogo">Catálogo</a>
+      <a href="#accesorios" data-view-link="accesorios">Accesorios</a>
+      <a href="#seguimiento" data-view-link="seguimiento">Seguir pedido</a>
       <a href="#como-funciona" data-anchor-link="como-funciona">Cómo funciona</a>
       <a href="#contacto" data-anchor-link="contacto">Contacto</a>
       <a href="#mis-actas" data-view-link="mis-actas" data-roles="cliente" hidden>Mis actas</a>
     </nav>
 
     <div class="header-actions">
+      <button class="btn btn-soft tx-cart-button" id="txCartButton" data-view-button="carrito" aria-label="Abrir el carrito">🛒 <span class="tx-cart-text">Carrito</span> <span class="tx-cart-count" id="txCartCount">0</span></button>
       <button class="btn btn-ghost" data-view-button="login">Iniciar sesión</button>
       <button class="btn btn-primary" data-view-button="catalogo">Ver vehículos</button>
     </div>
@@ -74,8 +77,8 @@
         </div>
         <div class="service-grid">
           <article class="service-card"><span class="service-icon">🚲</span><h3>Alquila</h3><p>Consulta vehículos disponibles y elige el que mejor se ajuste a tu recorrido.</p><button data-view-button="catalogo">Ver alquileres →</button></article>
-          <article class="service-card"><span class="service-icon">🛼</span><h3>Compra</h3><p>Explora dispositivos y accesorios disponibles para venta desde el catálogo.</p><button data-view-button="catalogo">Ver productos →</button></article>
-          <article class="service-card"><span class="service-icon">📦</span><h3>Domicilios</h3><p>Solicita la entrega de un vehículo o producto dentro de las zonas habilitadas.</p><button class="coming-soon">Próximamente</button></article>
+          <article class="service-card"><span class="service-icon">🛼</span><h3>Compra</h3><p>Explora dispositivos y accesorios disponibles para venta desde el catálogo.</p><button data-view-button="accesorios">Ver productos →</button></article>
+          <article class="service-card"><span class="service-icon">📦</span><h3>Domicilios</h3><p>Solicita la entrega de un vehículo o producto dentro de las zonas habilitadas.</p><button data-view-button="seguimiento">Seguir mi pedido →</button></article>
         </div>
       </section>
 
@@ -121,6 +124,47 @@
           <div class="catalog-grid" id="catalogGrid"></div>
           <div class="empty-state" id="emptyState" hidden><div>🔎</div><h3>No encontramos vehículos</h3><p>Prueba quitando algunos filtros.</p></div>
         </div>
+      </section>
+    </section>
+
+    <section class="view" id="view-accesorios" data-view="accesorios">
+      <section class="page-hero compact">
+        <div><span class="eyebrow">ACCESORIOS Y REPUESTOS · HU-04</span><h1>Completa tu equipo</h1><p>Cascos, candados, cargadores y repuestos. Agrégalos al carrito junto con los vehículos en venta del catálogo y paga todo en una sola compra.</p></div>
+      </section>
+      <section class="catalog-layout section">
+        <aside class="filters">
+          <div class="filter-header"><h3>Filtros</h3></div>
+          <label>Categoría<select id="txShopCategory"><option value="">Todas</option><option value="accesorio">Accesorios</option><option value="repuesto">Repuestos</option></select></label>
+          <label class="check-row"><input id="txShopAvailable" type="checkbox"> Solo con existencias</label>
+        </aside>
+        <div class="catalog-content">
+          <div class="catalog-toolbar"><div><strong id="txShopCount">0</strong> productos</div><button class="btn btn-ghost small-btn" data-view-button="carrito">Ver carrito</button></div>
+          <div id="txShopError" class="tx-availability no tx-panel-error" hidden></div>
+          <div class="catalog-grid" id="txShopGrid"></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="view-carrito" data-view="carrito">
+      <section class="page-hero compact">
+        <div><span class="eyebrow">CARRITO · HU-04</span><h1>Tu compra</h1><p>Vehículos y accesorios en una sola compra y un solo pago. Al comprar, apartamos todo durante 15 minutos mientras pagas.</p><div class="tx-account-actions"><button class="btn btn-ghost" data-view-button="catalogo">Ver vehículos</button><button class="btn btn-ghost" data-view-button="accesorios">Ver accesorios</button></div></div>
+      </section>
+      <section class="section tx-rentals-section">
+        <div id="txCartError" class="tx-availability no tx-panel-error" hidden></div>
+        <div id="txCartList" class="tx-rentals-list"></div>
+        <div id="txCartSummary" class="tx-cart-summary" hidden></div>
+      </section>
+    </section>
+
+    <section class="view" id="view-seguimiento" data-view="seguimiento">
+      <section class="page-hero compact">
+        <div><span class="eyebrow">SEGUIMIENTO · HU-07</span><h1>Sigue tu pedido</h1><p>Escribe el código de rastreo de tu domicilio (empieza por TX-). No necesitas iniciar sesión: solo se muestran el estado y la hora de cada cambio.</p>
+          <form class="tx-track-form" id="txTrackForm"><input id="txTrackCode" maxlength="40" placeholder="Ej. TX-ABCD1234" autocomplete="off" aria-label="Código de rastreo" required><button class="btn btn-primary" id="txTrackButton" type="submit">Consultar</button></form>
+        </div>
+      </section>
+      <section class="section tx-rentals-section">
+        <div id="txTrackError" class="tx-availability no tx-panel-error" hidden></div>
+        <div id="txTrackResult"></div>
       </section>
     </section>
 
@@ -187,5 +231,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="app.js"></script>
   <script src="paneles.js"></script>
+  <script src="cliente.js"></script>
 </body>
 </html>
