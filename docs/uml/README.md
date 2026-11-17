@@ -110,6 +110,7 @@ diagramas 1 a 4. En negrita, los diagramas de secuencia.
 | **HU-10** Inventario y alertas de bajo stock | `app/modulos/inventario` (`rutas_gestion.py`, `gestion.py`) | `GET /inventario/resumen`<br>`GET /inventario/alertas-stock`<br>`GET /inventario/tipos`<br>`POST /inventario/tipos`<br>`PATCH /inventario/tipos/{tipo_id}`<br>`GET /inventario/modelos`<br>`POST /inventario/modelos`<br>`PATCH /inventario/modelos/{modelo_id}`<br>`POST /inventario/unidades`<br>`PATCH /inventario/unidades/{vehiculo_id}`<br>`GET /inventario/productos`<br>`POST /inventario/productos`<br>`PATCH /inventario/productos/{producto_id}`<br>`POST /inventario/productos/{producto_id}/ajustes` | CU-07, CU-08 | 2, 3, 6, **18**, **19** |
 | **HU-11** Actas de entrega y recepción | `app/modulos/reportes` | `GET /actas`<br>`GET /actas/mias`<br>`GET /actas/exportacion/excel`<br>`GET /actas/exportacion/pdf`<br>`GET /actas/{acta_id}`<br>`GET /actas/{acta_id}/pdf`<br>`POST /actas/{acta_id}/conformidad`<br>`GET /actas/{acta_id}/verificacion` | CU-22, CU-23 | 2, 3, 6, **11**, **29** |
 | **HU-12** Usuarios, roles y JWT | `app/modulos/usuarios` y `app/seguridad.py` | `POST /autenticacion/token`<br>`POST /usuarios/registro`<br>`GET /usuarios/yo`<br>`GET /usuarios`<br>`POST /usuarios`<br>`GET /usuarios/{usuario_id}`<br>`PATCH /usuarios/{usuario_id}` | CU-03, CU-04 | 2, 3, 6, **14**, **15** |
+| Segunda API externa (materia de Backend): clima | `app/modulos/clima` | `GET /clima/pronostico` | — (consulta informativa dentro de CU-09) | 1, 3 |
 
 Notas de la tabla:
 

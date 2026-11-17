@@ -7608,6 +7608,67 @@
         }
       }
     },
+    "/clima/pronostico": {
+      "get": {
+        "tags": [
+          "clima"
+        ],
+        "summary": "Pronóstico del clima para las fechas de un alquiler",
+        "description": "Pronóstico diario de la ciudad (Open-Meteo) entre las dos fechas, con un aviso si se\nespera lluvia. Los días más allá de 16 días salen con ``disponible: false``. Público.",
+        "operationId": "pronostico_clima_pronostico_get",
+        "parameters": [
+          {
+            "name": "fecha_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Primer día del alquiler (AAAA-MM-DD).",
+              "title": "Fecha Inicio"
+            },
+            "description": "Primer día del alquiler (AAAA-MM-DD)."
+          },
+          {
+            "name": "fecha_fin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Último día del alquiler, inclusive.",
+              "title": "Fecha Fin"
+            },
+            "description": "Último día del alquiler, inclusive."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PronosticoRespuesta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorRespuesta"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "El servicio del clima no respondió"
+          }
+        }
+      }
+    },
     "/salud": {
       "get": {
         "tags": [
@@ -8661,6 +8722,85 @@
           "nota"
         ],
         "title": "DevolucionEjecutada"
+      },
+      "DiaPronosticoRespuesta": {
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date",
+            "title": "Fecha"
+          },
+          "disponible": {
+            "type": "boolean",
+            "title": "Disponible",
+            "description": "False si el día está más allá de lo que el proveedor puede pronosticar."
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion",
+            "examples": [
+              "Lluvia"
+            ]
+          },
+          "temperatura_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperatura Max",
+            "description": "°C",
+            "examples": [
+              27.4
+            ]
+          },
+          "temperatura_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperatura Min",
+            "description": "°C",
+            "examples": [
+              18.9
+            ]
+          },
+          "probabilidad_lluvia": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probabilidad Lluvia",
+            "description": "%",
+            "examples": [
+              80
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "fecha",
+          "disponible"
+        ],
+        "title": "DiaPronosticoRespuesta"
       },
       "DiaSemana": {
         "type": "string",
@@ -11460,6 +11600,63 @@
           "bajo_stock"
         ],
         "title": "ProductoGestion"
+      },
+      "PronosticoRespuesta": {
+        "properties": {
+          "fuente": {
+            "type": "string",
+            "title": "Fuente",
+            "description": "Proveedor que respondió.",
+            "examples": [
+              "open_meteo"
+            ]
+          },
+          "dias": {
+            "items": {
+              "$ref": "#/components/schemas/DiaPronosticoRespuesta"
+            },
+            "type": "array",
+            "title": "Dias"
+          },
+          "dias_con_lluvia": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dias Con Lluvia"
+          },
+          "umbral_lluvia": {
+            "type": "integer",
+            "title": "Umbral Lluvia",
+            "description": "Porcentaje desde el cual se avisa.",
+            "examples": [
+              60
+            ]
+          },
+          "aviso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aviso",
+            "examples": [
+              "Probabilidad de lluvia de 60 % o más el día 20/11. Considera llevar impermeable."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "fuente",
+          "dias",
+          "dias_con_lluvia",
+          "umbral_lluvia"
+        ],
+        "title": "PronosticoRespuesta"
       },
       "PseCrear": {
         "properties": {

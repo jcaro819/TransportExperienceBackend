@@ -4,6 +4,21 @@
 
 ---
 
+## 0. Este repositorio es el de la materia de Backend
+
+`TransportExperienceBackend` es una copia (con historial) del repositorio de Ingeniería de
+Software 2, para el proyecto final de **Desarrollo y Arquitectura Backend** (UNAB, profesor
+Feisar Moreno). Grupo: Juan Felipe Caro Niño, Santiago Brito y George Sebastian Makhlouf.
+
+- Aquí manda el **enunciado de Backend** además del backlog de abajo. Lo agregado por eso:
+  la segunda API externa (`app/modulos/clima/`, Open-Meteo), pruebas por HTTP de los 88
+  endpoints y `scripts/reiniciar_bd.py` (equivalente de `migrate:fresh --seed`). La tabla
+  de equivalencias con Laravel está en `docs/equivalencias-laravel.md`.
+- Los cambios hechos aquí **no** se llevan al repositorio de Software 2 salvo que el equipo
+  de esa materia lo decida: allá el alcance sigue siendo el backlog de 100 SP.
+- Las pruebas siguen en PostgreSQL, no en SQLite (ver la justificación en
+  `docs/equivalencias-laravel.md`).
+
 ## 1. Contexto
 
 Proyecto académico de ingeniería de software. Equipo **SystemSolutions**, 4 integrantes,

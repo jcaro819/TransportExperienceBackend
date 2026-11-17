@@ -138,6 +138,10 @@ Toda respuesta de error, sin excepción, tiene esta estructura:
 | `domicilio_no_encontrado` | 404 | El domicilio no existe o no es tuyo |
 | `pago_no_encontrado` | 404 | El pago no existe o es de otro cliente |
 | `producto_no_encontrado` | 404 | El accesorio o repuesto no existe o ya no se vende |
+| `rango_de_fechas_invalido` | 422 | Clima: la fecha final es anterior a la inicial |
+| `fecha_en_el_pasado` | 422 | Clima: no hay pronóstico de fechas que ya pasaron |
+| `rango_demasiado_largo` | 422 | Clima: el rango supera el máximo de días de un alquiler |
+| `clima_no_disponible` | 503 | Open-Meteo no respondió; la reserva sigue funcionando |
 | `metodo_no_permitido` | 405 | La dirección no admite ese método |
 | `correo_ya_registrado` | 409 | Ya hay una cuenta con ese correo |
 | `cambio_sobre_si_mismo` | 409 | Un administrador intenta desactivarse o quitarse el rol |
@@ -548,6 +552,16 @@ python -m simulador_gps
 Mueve 5 vehículos de la flota por calles de Bucaramanga y envía sus posiciones cada 5 s por
 el mismo endpoint que usaría un GPS real. Detenlo con Ctrl+C: a los 30 s los vehículos
 pasan a `sin_senal`.
+
+### Clima (segunda API externa: Open-Meteo)
+
+| Método | Ruta | Quién | Para qué |
+|---|---|---|---|
+| `GET` | `/clima/pronostico` | Público | Pronóstico diario de Bucaramanga entre `fecha_inicio` y `fecha_fin`, con `aviso` si se espera lluvia |
+
+El pronóstico es informativo: si falla (503), la reserva se puede hacer igual. Open-Meteo
+pronostica 16 días; los días posteriores salen con `disponible: false`. El umbral del
+aviso es el parámetro `porcentaje_lluvia_aviso` de `parametros_sistema` (60 %).
 
 ### Sistema
 

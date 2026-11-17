@@ -369,6 +369,11 @@ function injectClientUi() {
     .tx-pending-text{font-style:normal}
     .tx-pending-shortcut span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:3px;border-radius:999px;background:#fff;color:#8a5900;font-size:10px;font-weight:800}
     .tx-availability.checking{display:flex;align-items:center;gap:10px;color:var(--muted)}
+    .tx-weather{padding:10px 12px;border-radius:12px;background:#eef5fb;color:#24476b;font-size:12px;line-height:1.5}
+    .tx-weather.warn{background:#fff6e0;color:#7a5600}
+    .tx-weather ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:2px}
+    .tx-weather li{display:flex;justify-content:space-between;gap:10px}
+    .tx-weather small{color:inherit;opacity:.8}
     .tx-spinner{width:18px;height:18px;border:2px solid rgba(18,86,61,.18);border-top-color:#12563d;border-radius:50%;animation:tx-spin .72s linear infinite;flex:0 0 auto}
     .tx-rental-card.tx-pending-focus{outline:2px solid rgba(217,151,36,.5);box-shadow:0 0 0 5px rgba(217,151,36,.10)}
     @keyframes tx-spin{to{transform:rotate(360deg)}}
@@ -813,6 +818,7 @@ function reservationBlock(model, detail) {
         <span class="tx-spinner" aria-hidden="true"></span>
         <span>Verificando disponibilidad para estas fechas...</span>
       </div>
+      <div id="txWeather" class="tx-weather" aria-live="polite">Consultando el clima...</div>
       <button class="btn btn-primary" id="txCreateRental" disabled>Verificando disponibilidad...</button>
     </div>
   `;
@@ -902,6 +908,7 @@ function setupReservationForm(model) {
 
     const currentVersion = ++requestVersion;
     showCheckingState();
+    showWeather(currentVersion);
 
     try {
       const params = new URLSearchParams({
@@ -942,6 +949,35 @@ function setupReservationForm(model) {
       availabilityBox.textContent = error.message;
       createButton.disabled = true;
       createButton.textContent = "No se pudo verificar";
+    }
+  }
+
+  // Pronóstico del clima (Open-Meteo vía backend). Es informativo: si falla, la reserva
+  // sigue igual y solo se avisa que no hay pronóstico.
+  async function showWeather(version) {
+    const box = document.getElementById("txWeather");
+    if (!box || !start.value || !end.value) return;
+    box.className = "tx-weather";
+    box.textContent = "Consultando el clima...";
+    try {
+      const params = new URLSearchParams({ fecha_inicio: start.value, fecha_fin: end.value });
+      const data = await api(`/clima/pronostico?${params}`);
+      if (version !== requestVersion) return;
+      const days = data.dias.slice(0, 7).map(day => {
+        if (!day.disponible) {
+          return `<li><span>${escapeHtml(day.fecha)}</span><small>Aún sin pronóstico</small></li>`;
+        }
+        const temps = `${Math.round(day.temperatura_min)}–${Math.round(day.temperatura_max)} °C`;
+        return `<li><span>${escapeHtml(day.fecha)} · ${escapeHtml(day.descripcion || "")}</span>`
+          + `<small>${temps} · ${day.probabilidad_lluvia} % lluvia</small></li>`;
+      }).join("");
+      const more = data.dias.length > 7 ? `<small>Y ${data.dias.length - 7} día(s) más.</small>` : "";
+      box.className = data.aviso ? "tx-weather warn" : "tx-weather";
+      box.innerHTML = `<strong>${data.aviso ? "☔ " + escapeHtml(data.aviso) : "⛅ Clima en Bucaramanga"}</strong><ul>${days}</ul>${more}`;
+    } catch (error) {
+      if (version !== requestVersion) return;
+      box.className = "tx-weather";
+      box.textContent = "Pronóstico del clima no disponible ahora (no afecta la reserva).";
     }
   }
 

@@ -57,6 +57,12 @@ class Configuracion(BaseSettings):
     wompi_secreto_eventos: str = ""
     wompi_secreto_integridad: str = ""
 
+    # Pronóstico del clima (segunda API externa): "falso" no toca la red; "open_meteo"
+    # consulta https://open-meteo.com (gratis, sin llave). Coordenadas de la ciudad.
+    clima_proveedor: Literal["falso", "open_meteo"] = "falso"
+    clima_latitud: float = 7.1193
+    clima_longitud: float = -73.1227
+
     @property
     def lista_cors_origenes(self) -> list[str]:
         return [origen.strip() for origen in self.cors_origenes.split(",") if origen.strip()]
