@@ -14,6 +14,7 @@ MODULOS = [
     "rastreo",
     "reportes",
     "portal",
+    "clima",
 ]
 
 

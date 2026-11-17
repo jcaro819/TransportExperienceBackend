@@ -18,6 +18,7 @@ from app.db import Base
 MAX_DIAS_ALQUILER = "max_dias_alquiler"
 MAX_MINUTOS_PAGO_PENDIENTE = "max_minutos_pago_pendiente"
 SEGUNDOS_SIN_SENAL = "segundos_sin_senal"
+PORCENTAJE_LLUVIA_AVISO = "porcentaje_lluvia_aviso"
 
 
 class ParametroSistema(Base):

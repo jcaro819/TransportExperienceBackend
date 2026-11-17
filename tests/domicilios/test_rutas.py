@@ -128,3 +128,47 @@ def test_entregado_y_cancelado_son_terminales() -> None:
 def test_no_se_salta_pasos() -> None:
     assert not es_transicion_valida(E.PENDIENTE, E.EN_CAMINO)
     assert not es_transicion_valida(E.ASIGNADO, E.ENTREGADO)
+
+
+# --- Consulta y cancelación del cliente por HTTP -------------------------------------------
+
+
+def _solicitar(cliente_api, reserva) -> dict:
+    alquiler_id, cliente = reserva
+    creado = cliente_api.post(
+        "/domicilios",
+        json={"alquiler_id": alquiler_id, "direccion": "Calle 36 # 19-20", **PUNTO},
+        headers=cliente,
+    )
+    assert creado.status_code == 201
+    return creado.json()
+
+
+def test_el_cliente_ve_sus_domicilios_y_el_detalle(cliente_api, crear_usuario, reserva) -> None:
+    _, cliente = reserva
+    domicilio = _solicitar(cliente_api, reserva)
+
+    mios = cliente_api.get("/domicilios/mios", headers=cliente)
+    detalle = cliente_api.get(f"/domicilios/{domicilio['id']}", headers=cliente)
+    ajeno = cliente_api.get(
+        f"/domicilios/{domicilio['id']}", headers=encabezado_de(crear_usuario(Rol.CLIENTE))
+    )
+
+    assert mios.status_code == 200
+    assert [d["id"] for d in mios.json()["elementos"]] == [domicilio["id"]]
+    assert detalle.status_code == 200
+    assert detalle.json()["codigo_rastreo"] == domicilio["codigo_rastreo"]
+    assert ajeno.status_code == 404
+
+
+def test_el_cliente_quita_el_domicilio_antes_de_pagar(cliente_api, reserva) -> None:
+    alquiler_id, cliente = reserva
+    domicilio = _solicitar(cliente_api, reserva)
+
+    cancelado = cliente_api.post(f"/domicilios/{domicilio['id']}/cancelacion", headers=cliente)
+    alquiler = cliente_api.get(f"/alquileres/{alquiler_id}", headers=cliente).json()
+
+    assert cancelado.status_code == 200
+    assert cancelado.json()["estado"] == "cancelado"
+    assert alquiler["valor_envio"] == 0
+    assert alquiler["total"] == alquiler["subtotal"]

@@ -21,6 +21,7 @@ class "app/main.py" as main <<control maestro>> {
   app.include_router(enrutador_domicilios)
   app.include_router(enrutador_rastreo)
   app.include_router(enrutador_actas)
+  app.include_router(enrutador_clima)
   --
   GET /salud → salud()
 }
@@ -62,6 +63,21 @@ package "app/modulos/alquileres\n<size:10>además: consultas.py, esquemas.py, es
   class "modelos.py" as alquileres_modelos <<modelos>> {
     enum EstadoAlquiler
     Alquiler  <<alquileres>>
+  }
+}
+
+package "app/modulos/clima\n<size:10>además: esquemas.py, excepciones.py, open_meteo.py</size>" {
+  class "rutas.py" as clima_rutas <<rutas>> {
+    GET /clima/pronostico → pronostico()
+  }
+  class "proveedor.py" as clima_proveedor <<servicio>> {
+    class ProveedorClima
+    class ClimaFalso
+    obtener_proveedor_clima()
+  }
+  class "servicio.py" as clima_servicio <<servicio>> {
+    descripcion_wmo()
+    pronostico_para_alquiler()
   }
 }
 
@@ -365,6 +381,10 @@ alquileres_rutas ..> alquileres_modelos
 alquileres_rutas --> alquileres_servicio
 alquileres_servicio --> alquileres_modelos
 main --> alquileres_rutas : enrutador_alquileres
+clima_rutas --> clima_proveedor
+clima_rutas --> clima_servicio
+clima_servicio --> clima_proveedor
+main --> clima_rutas : enrutador_clima
 domicilios_rutas ..> domicilios_modelos
 domicilios_rutas --> domicilios_servicio
 domicilios_servicio --> domicilios_modelos

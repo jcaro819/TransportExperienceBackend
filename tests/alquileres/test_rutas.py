@@ -109,3 +109,93 @@ def test_el_operador_no_reasigna(cliente_api, crear_usuario) -> None:
         "/alquileres/1/reasignacion", json={}, headers=encabezado_de(crear_usuario(Rol.OPERADOR))
     )
     assert respuesta.status_code == 403
+
+
+# --- Cancelación con devolución (HU-05, decisiones 3 y 4 del Sprint 2) ----------------------
+
+
+def _reservar_y_pagar(cliente_api, modelo, cliente) -> dict:
+    alquiler = cliente_api.post("/alquileres", json=_cuerpo(modelo), headers=cliente).json()
+    pago = cliente_api.post(
+        f"/alquileres/{alquiler['id']}/pago", json={"metodo_pago": "tarjeta"}, headers=cliente
+    )
+    assert pago.status_code == 201
+    return alquiler
+
+
+def test_el_administrador_cancela_con_devolucion_por_http(
+    cliente_api, fabrica, crear_usuario, modelo
+) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    alquiler = _reservar_y_pagar(cliente_api, modelo, cliente)
+    administrador = encabezado_de(crear_usuario(Rol.ADMINISTRADOR))
+
+    respuesta = cliente_api.post(
+        f"/alquileres/{alquiler['id']}/cancelacion-con-devolucion",
+        json={"motivo": "La unidad quedó en mantenimiento."},
+        headers=administrador,
+    )
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["alquiler"]["estado"] == "cancelado"
+    assert cuerpo["devolucion"]["tipo"] == "compensacion"
+    assert cuerpo["devolucion"]["estado"] == "pendiente"
+    assert cuerpo["devolucion"]["monto"] == alquiler["total"]
+    pendientes = cliente_api.get("/pagos/devoluciones-pendientes", headers=administrador).json()
+    assert cuerpo["devolucion"]["referencia"] in [p["referencia"] for p in pendientes["elementos"]]
+
+
+@pytest.mark.parametrize("rol", [Rol.OPERADOR, Rol.CLIENTE])
+def test_solo_el_administrador_cancela_con_devolucion(
+    cliente_api, fabrica, crear_usuario, modelo, rol
+) -> None:
+    alquiler = _reservar_y_pagar(cliente_api, modelo, encabezado_de(fabrica.cliente()))
+    respuesta = cliente_api.post(
+        f"/alquileres/{alquiler['id']}/cancelacion-con-devolucion",
+        json={"motivo": "Motivo de prueba."},
+        headers=encabezado_de(crear_usuario(rol)),
+    )
+    assert respuesta.status_code == 403
+
+
+def test_sin_pagar_no_se_cancela_con_devolucion(
+    cliente_api, fabrica, crear_usuario, modelo
+) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    alquiler = cliente_api.post("/alquileres", json=_cuerpo(modelo), headers=cliente).json()
+    respuesta = cliente_api.post(
+        f"/alquileres/{alquiler['id']}/cancelacion-con-devolucion",
+        json={"motivo": "Motivo de prueba."},
+        headers=encabezado_de(crear_usuario(Rol.ADMINISTRADOR)),
+    )
+    assert respuesta.status_code == 409
+    assert respuesta.json()["error"]["codigo"] == "alquiler_no_cancelable"
+
+
+def test_motivo_demasiado_corto_es_422(cliente_api, fabrica, crear_usuario, modelo) -> None:
+    alquiler = _reservar_y_pagar(cliente_api, modelo, encabezado_de(fabrica.cliente()))
+    respuesta = cliente_api.post(
+        f"/alquileres/{alquiler['id']}/cancelacion-con-devolucion",
+        json={"motivo": "no"},
+        headers=encabezado_de(crear_usuario(Rol.ADMINISTRADOR)),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_el_cliente_cancela_su_reserva_pendiente_por_http(
+    cliente_api, fabrica, crear_usuario, modelo
+) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    alquiler = cliente_api.post("/alquileres", json=_cuerpo(modelo), headers=cliente).json()
+    ruta = f"/alquileres/{alquiler['id']}/cancelacion"
+    motivo = {"motivo": "Cambié de planes."}
+
+    ajena = cliente_api.post(ruta, json=motivo, headers=encabezado_de(crear_usuario(Rol.CLIENTE)))
+    propia = cliente_api.post(ruta, json=motivo, headers=cliente)
+    otra_vez = cliente_api.post(ruta, json=motivo, headers=cliente)
+
+    assert ajena.status_code == 404
+    assert propia.status_code == 200
+    assert propia.json()["estado"] == "cancelado"
+    assert otra_vez.status_code == 409

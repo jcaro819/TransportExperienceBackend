@@ -1,13 +1,44 @@
 # TransportExperience — Backend
 
 Plataforma para alquilar, vender y entregar a domicilio ciclas, patines y monopatines
-eléctricos. Proyecto académico del equipo **SystemSolutions** (Scrum, 4 sprints de 2 semanas).
+eléctricos: API REST en **Python con FastAPI**, PostgreSQL y un frontend web que la consume.
+
+## Proyecto final — Desarrollo y Arquitectura Backend
+
+Este repositorio es el proyecto final de la asignatura **Desarrollo y Arquitectura
+Backend** (UNAB, profesor Feisar Moreno).
+
+**Integrantes del grupo:** Juan Felipe Caro Niño, Santiago Brito y George Sebastian
+Makhlouf.
+
+**Origen y autoría.** El sistema nació como el proyecto de **Ingeniería de Software 2** del
+equipo SystemSolutions ([repositorio original](https://github.com/jcaro819/Transportexperience)).
+Este repositorio es una copia con todo su historial, así que cada commit conserva su autor
+y su fecha. En ese equipo, Juan Felipe Caro Niño desarrolló el backend; el frontend es de
+Julián Mejía y la documentación de requisitos y planeación, de Lucas Ardila y Dawer Patiño.
+Lo que se agregó para esta asignatura (la segunda API externa, las pruebas que completan el
+100 % de los endpoints y la equivalencia con Laravel) está en este repositorio.
+
+**Cómo cumple el enunciado:** ver [`docs/equivalencias-laravel.md`](docs/equivalencias-laravel.md),
+con cada requisito (Eloquent, Sanctum, Gates y Policies, FormRequest, `migrate:fresh
+--seed`...) y dónde está su equivalente en el código.
+
+| Requisito | Cumplimiento |
+|---|---|
+| Modelos y tablas (mínimo 8) | 19 tablas de negocio con SQLAlchemy 2 y migraciones de Alembic |
+| Endpoints REST (mínimo 4) | 88 endpoints, documentados en OpenAPI (`/docs`) |
+| APIs externas (mínimo 2) | **Wompi** (pagos, sandbox) y **Open-Meteo** (pronóstico del clima) |
+| Autenticación y roles (mínimo 3) | JWT con OAuth2 y 4 roles: cliente, administrador, operador y domiciliario |
+| Pruebas del 100 % de los endpoints | Los 88 endpoints tienen prueba por HTTP; APIs externas simuladas |
+| Frontend | Web en `frontend/` (HTML, CSS y JavaScript) |
+
+Más documentación:
 
 - Requisitos: [`docs/SRS.pdf`](docs/SRS.pdf)
 - Plan y backlog: [`docs/plan-desarrollo.pdf`](docs/plan-desarrollo.pdf)
 - Guía de la API para el frontend: [`docs/api/README.md`](docs/api/README.md)
+- Diagramas UML generados desde el código: [`docs/uml/README.md`](docs/uml/README.md)
 - Abrir el sistema desde otro equipo (túnel para la sustentación): [`docs/sustentacion-tunel.md`](docs/sustentacion-tunel.md)
-- Guía de trabajo del equipo y de Claude Code: [`CLAUDE.md`](CLAUDE.md)
 
 ## Requisitos previos
 
@@ -19,8 +50,8 @@ eléctricos. Proyecto académico del equipo **SystemSolutions** (Scrum, 4 sprint
 
 ```bash
 # 1. Clonar
-git clone https://github.com/jcaro819/Transportexperience.git
-cd Transportexperience
+git clone https://github.com/jcaro819/TransportExperienceBackend.git
+cd TransportExperienceBackend
 
 # 2. Crear y activar el entorno virtual (nunca instalar global)
 python -m venv .venv
@@ -32,14 +63,24 @@ pip install -e ".[dev]"
 
 # 4. Variables de entorno
 cp .env.example .env             # Windows: copy .env.example .env
+#    En el .env, cambia JWT_SECRETO por uno propio (la API no arranca con el de ejemplo):
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 # 5. Levantar PostgreSQL y Adminer (http://localhost:8080)
 docker compose up -d --wait
 
-# 6. Aplicar migraciones y arrancar la API
-alembic upgrade head
+# 6. Crear las tablas y cargar los datos de ejemplo (= php artisan migrate:fresh --seed)
+python -m scripts.reiniciar_bd   # borra la base de desarrollo y la recrea; o: alembic upgrade head
+
+# 7. Arrancar la API
 uvicorn app.main:app --reload    # docs en http://127.0.0.1:8000/docs
+
+# 8. Correr las pruebas (en otra terminal, con el entorno activado)
+pytest
 ```
+
+Para ver la página: en otra terminal, `cd frontend` y `python -m http.server 5173`, y abre
+http://localhost:5173.
 
 ## Datos de ejemplo (seeds)
 
@@ -136,7 +177,9 @@ app/
     ├── pagos/      HU-05
     ├── domicilios/ HU-06, HU-07
     ├── rastreo/    HU-08
-    └── reportes/   HU-11
+    ├── reportes/   HU-11
+    ├── portal/     HU-01
+    └── clima/      segunda API externa (Open-Meteo), materia de Backend
 simulador_gps/      posiciones simuladas para desarrollar HU-08 sin hardware
 seeds/              datos de ejemplo
 docs/uml/           diagramas (PlantUML / Mermaid)

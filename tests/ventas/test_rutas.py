@@ -100,3 +100,49 @@ def test_permisos_de_los_listados(cliente_api, fabrica, crear_usuario) -> None:
     assert (
         cliente_api.get("/ventas/devoluciones-pendientes", headers=administrador).status_code == 200
     )
+
+
+# --- Detalle y cancelación por HTTP --------------------------------------------------------
+
+
+def test_detalle_de_la_venta_solo_para_su_cliente(
+    cliente_api, fabrica, crear_usuario, carrito
+) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    venta = cliente_api.post("/ventas", json=carrito, headers=cliente).json()
+
+    propia = cliente_api.get(f"/ventas/{venta['id']}", headers=cliente)
+    otro_cliente = encabezado_de(crear_usuario(Rol.CLIENTE))
+    ajena = cliente_api.get(f"/ventas/{venta['id']}", headers=otro_cliente)
+
+    assert propia.status_code == 200
+    assert propia.json()["id"] == venta["id"]
+    assert ajena.status_code == 404
+
+
+def test_el_cliente_cancela_su_compra_y_devuelve_el_stock(cliente_api, fabrica, carrito) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    venta = cliente_api.post("/ventas", json=carrito, headers=cliente).json()
+
+    cancelada = cliente_api.post(
+        f"/ventas/{venta['id']}/cancelacion", json={"motivo": "Cambié de planes."}, headers=cliente
+    )
+
+    assert cancelada.status_code == 200
+    assert cancelada.json()["estado"] == "cancelada"
+    [casco] = cliente_api.get("/catalogo/productos").json()["elementos"]
+    assert casco["stock"] == 4  # las 2 apartadas volvieron
+
+
+def test_una_compra_pagada_no_se_cancela_desde_la_app(cliente_api, fabrica, carrito) -> None:
+    cliente = encabezado_de(fabrica.cliente())
+    venta = cliente_api.post("/ventas", json=carrito, headers=cliente).json()
+    cliente_api.post(
+        f"/ventas/{venta['id']}/pago", json={"metodo_pago": "tarjeta"}, headers=cliente
+    )
+
+    respuesta = cliente_api.post(
+        f"/ventas/{venta['id']}/cancelacion", json={"motivo": "Cambié de planes."}, headers=cliente
+    )
+
+    assert respuesta.status_code == 409
