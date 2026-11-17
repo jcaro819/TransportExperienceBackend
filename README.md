@@ -34,6 +34,7 @@ con cada requisito (Eloquent, Sanctum, Gates y Policies, FormRequest, `migrate:f
 
 Más documentación:
 
+- **Guía de estudio del backend (para el grupo):** [`docs/guia-estudio-backend.md`](docs/guia-estudio-backend.md)
 - Requisitos: [`docs/SRS.pdf`](docs/SRS.pdf)
 - Plan y backlog: [`docs/plan-desarrollo.pdf`](docs/plan-desarrollo.pdf)
 - Guía de la API para el frontend: [`docs/api/README.md`](docs/api/README.md)
