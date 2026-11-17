@@ -5,14 +5,17 @@ description = "Backend del MVP de TransportExperience: alquiler, venta y domicil
 requires-python = ">=3.11"
 authors = [{ name = "SystemSolutions" }]
 dependencies = [
-    "fastapi>=0.115",
+    # FastAPI y pydantic fijos: de su versión depende cómo se genera docs/api/openapi.json,
+    # y tests/test_openapi.py exige que coincida byte a byte. Para subirlas, cambia la
+    # versión, ejecuta python -m scripts.exportar_openapi y sube el JSON con el cambio.
+    "fastapi==0.163.1",
     "uvicorn[standard]>=0.30",
     # Formularios: el login OAuth2 de FastAPI (OAuth2PasswordRequestForm) los necesita.
     "python-multipart>=0.0.9",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
-    "pydantic>=2.7",
+    "pydantic==2.14.3",
     "pydantic-settings>=2.3",
     # 3.4.0 corrige CVE-2024-33663 (confusión de algoritmo) y CVE-2024-33664 (JWE bomb).
     "python-jose[cryptography]>=3.4.0",

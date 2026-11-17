@@ -5414,9 +5414,11 @@
                   "minimum": -90.0
                 },
                 {
-                  "type": "string",
-                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,6}0*$"
+                  "type": "string"
                 }
+              ],
+              "examples": [
+                "7.119300"
               ],
               "title": "Latitud"
             }
@@ -5433,9 +5435,11 @@
                   "minimum": -180.0
                 },
                 {
-                  "type": "string",
-                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,6}0*$"
+                  "type": "string"
                 }
+              ],
+              "examples": [
+                "-73.122700"
               ],
               "title": "Longitud"
             }
@@ -8917,8 +8921,7 @@
                 "minimum": -90.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,6}0*$"
+                "type": "string"
               }
             ],
             "title": "Latitud",
@@ -8935,8 +8938,7 @@
                 "minimum": -180.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,6}0*$"
+                "type": "string"
               }
             ],
             "title": "Longitud",
@@ -9020,12 +9022,10 @@
           },
           "latitud": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Latitud"
           },
           "longitud": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Longitud"
           },
           "cliente": {
@@ -11098,8 +11098,7 @@
                 "minimum": -90.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Latitud",
@@ -11115,8 +11114,7 @@
                 "minimum": -180.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               }
             ],
             "title": "Longitud",
@@ -11132,8 +11130,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -11150,8 +11147,7 @@
                 "minimum": 0.0
               },
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -11217,19 +11213,16 @@
         "properties": {
           "latitud": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Latitud"
           },
           "longitud": {
             "type": "string",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Longitud"
           },
           "precision_metros": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -11240,8 +11233,7 @@
           "velocidad_kmh": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "type": "string"
               },
               {
                 "type": "null"
